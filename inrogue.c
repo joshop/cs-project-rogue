@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 // colors
 #define BLACK 30
 #define RED 31
@@ -18,8 +19,24 @@
 #define T_WALL 1
 #define T_BORDER 2 // solid wall at the edge of map
 #define T_LAVA 3
+// item nums
+#define I_NOTHING 0
+// generic (red potion, yew wand)
+#define I_POTION_RED 1
+#define I_POTION_GREEN 2
+// specific (healing potion, lightning wand)
+#define I_POTION_DEATH 3
+#define I_POTION_NOTHING 4
+
+#define NUM_OF_IDEN_ITEMS 2
 // 447135
 
+
+#define D_WIDTH 20
+#define D_HEIGHT 20
+
+int GENERICS[NUM_OF_IDEN_ITEMS] = {I_POTION_RED,I_POTION_GREEN};
+int SPECIFICS[NUM_OF_IDEN_ITEMS] = {I_POTION_DEATH, I_POTION_NOTHING};
 char *times(char *str, int reps) { // repeats a string a certain number of times.
 	char *buf = (char *)malloc(1024);
 	*buf = 0;
@@ -56,9 +73,12 @@ char TILES[] = " ##:";
 int T_COLORS[] = {WHITE,WHITE,BLUE,RED};
 #define SOLID 1
 int T_FLAGS[] = {0,SOLID,SOLID,0}; 
+// itemset and items on map
+int ITEMS[D_WIDTH][D_HEIGHT];
+char *ITEM_CHARS = " !";
+int *ITEM_COLS = {WHITE,GREEN};
+
 // dungeon
-#define D_WIDTH 20
-#define D_HEIGHT 20
 int dungeon[D_WIDTH][D_HEIGHT];
 // player
 int player_x;
@@ -174,7 +194,28 @@ void pr_info(char *msg) {
 }
 int death = 0;
 bool important_msg = false;
+char *death_reason;
+int iden_generics[NUM_OF_IDEN_ITEMS];
+int iden_specifics[NUM_OF_IDEN_ITEMS];
+bool is_contained_in(int arr[], int size, int val) {
+	for (int idx = 0; idx < size; idx++) {
+		if (arr[idx] == val) {
+			return true;
+		}
+	}
+	return false;
+}
+void shuffle_rand_items() { // generates identifiable items
+	for(int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
+
+	}
+}
 int main() {
+	srand(time(NULL));
+	shuffle_rand_items();
+	printf("%s",ANSI_clr);
+	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nHave fun! (press a key to start)",GREEN);
+	getch_(0);
 	if (fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR)) {
 		printc("ERROR: initial airfill failed!\n",RED);
 		return 1;
@@ -237,6 +278,7 @@ int main() {
 				// burn to death
 				death = 1;
 				pr_info("You burned in lava.");
+				death_reason = "burning in lava";
 			}
 		}	
 		if (death == 3) {
@@ -248,5 +290,12 @@ int main() {
 		} else if (death == 1) {
 			death = 2;
 		}
+	}
+	if (death) { // did you die, or did the user quit?
+		printf("%s",ANSI_clr);
+		color_set(RED);
+		printf("GAME OVER\nYou died on level 8 of the dungeon.\nYou were killed by %s.\nPress any key to exit the game\n",death_reason);
+		color_reset();
+		getch_(0);
 	}
 }

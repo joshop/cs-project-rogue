@@ -29,14 +29,13 @@
 #define I_POTION_NOTHING 4
 
 #define NUM_OF_IDEN_ITEMS 2
+#define FIRST_GENERIC I_POTION_RED
 // 447135
 
 
 #define D_WIDTH 20
 #define D_HEIGHT 20
 
-int GENERICS[NUM_OF_IDEN_ITEMS] = {I_POTION_RED,I_POTION_GREEN};
-int SPECIFICS[NUM_OF_IDEN_ITEMS] = {I_POTION_DEATH, I_POTION_NOTHING};
 char *times(char *str, int reps) { // repeats a string a certain number of times.
 	char *buf = (char *)malloc(1024);
 	*buf = 0;
@@ -74,10 +73,10 @@ int T_COLORS[] = {WHITE,WHITE,BLUE,RED};
 #define SOLID 1
 int T_FLAGS[] = {0,SOLID,SOLID,0}; 
 // itemset and items on map
-int ITEMS[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !";
-int *ITEM_COLS = {WHITE,GREEN};
-
+int items[D_WIDTH][D_HEIGHT];
+char *ITEM_CHARS = " !!!!";
+int ITEM_COLS[] = {WHITE,GREEN};
+char *ITEM_NAMES[] = {"nothing","red potion","green potion","potion of death","potion of nothing"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 // player
@@ -197,7 +196,8 @@ bool important_msg = false;
 char *death_reason;
 int iden_generics[NUM_OF_IDEN_ITEMS];
 int iden_specifics[NUM_OF_IDEN_ITEMS];
-bool is_contained_in(int arr[], int size, int val) {
+bool is_contained_in(int arr[], int size, int val) { // is the val contained in the arr?
+	printf("checking for %d\n",val);
 	for (int idx = 0; idx < size; idx++) {
 		if (arr[idx] == val) {
 			return true;
@@ -207,12 +207,42 @@ bool is_contained_in(int arr[], int size, int val) {
 }
 void shuffle_rand_items() { // generates identifiable items
 	for(int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
-
+		int new_value;
+		do {
+			new_value = rand() % NUM_OF_IDEN_ITEMS + FIRST_GENERIC;
+		} while(is_contained_in(iden_generics, NUM_OF_IDEN_ITEMS, new_value));
+		iden_generics[i] = new_value;
+		printf("DROUS %d\n",i);
+		do {
+			new_value = rand() % NUM_OF_IDEN_ITEMS + FIRST_GENERIC + NUM_OF_IDEN_ITEMS;
+		} while(is_contained_in(iden_specifics, NUM_OF_IDEN_ITEMS, new_value));
+		iden_specifics[i] = new_value;
+		printf("CROUS %d\n",i);
+	}
+}
+void display_generic_specific() { // solely debug
+	for (int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
+		color_set(MAGENTA);
+		printf("GENERIC: %d, SPECIFIC: %d\n",iden_generics[i],iden_specifics[i]);
+		color_reset();
+	}
+}
+void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
+	for (int y = 0; y < D_HEIGHT; y++) {
+		for (int x = 0; x < D_WIDTH; x++) {
+			if (itemlist[y][x]) { // an item exists there
+				char ic = ITEM_CHARS[itemlist[y][x]];
+				printf("%s", ANSI_home);
+				printf("%s%s%c", times(ANSI_right, x), times(ANSI_down, y),ic);
+				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
+			}
+		}
 	}
 }
 int main() {
 	srand(time(NULL));
 	shuffle_rand_items();
+	display_generic_specific();
 	printf("%s",ANSI_clr);
 	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
@@ -220,7 +250,10 @@ int main() {
 		printc("ERROR: initial airfill failed!\n",RED);
 		return 1;
 	}
+	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
+	items[7][7] = I_POTION_GREEN;
+
 	bool game_running = true;
 	player_x = 1;
 	player_y = 1;
@@ -229,7 +262,8 @@ int main() {
 		enforce_borders();
 		printf("%s",ANSI_clr);
 		display_dungeon(0,0);
-		display_player();
+		display_items(items);
+		display_player(); // display player AFTER items, so it shows as @ when you're on an item
 		// print messages
 		for (int i = 0; i < 5; i++) {
 			printf("%s\n",infos[i]);
@@ -281,6 +315,15 @@ int main() {
 				death_reason = "burning in lava";
 			}
 		}	
+
+		// check if there's an item below you
+		if (items[player_y][player_x]) {
+			char *iname = ITEM_NAMES[items[player_y][player_x]];
+			char tmp_s[50];
+			sprintf(tmp_s,"There is %s %s below you.",(iname[0] =='a' || iname[0] =='e' ||iname[0] =='o' || iname[0] =='i' || iname[0] =='u')?"an":"a",ITEM_NAMES[items[player_y][player_x]]);
+			pr_info(tmp_s);
+		}
+		// check if you've died
 		if (death == 3) {
 			game_running = false;
 		} else if (death == 2) {

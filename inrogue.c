@@ -200,10 +200,10 @@ bool is_contained_in(int arr[], int size, int val) { // is the val contained in 
 	printf("checking for %d\n",val);
 	for (int idx = 0; idx < size; idx++) {
 		if (arr[idx] == val) {
-			return true;
+			return idx+1;
 		}
 	}
-	return false;
+	return 0;
 }
 void shuffle_rand_items() { // generates identifiable items
 	for(int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
@@ -236,6 +236,73 @@ void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 				printf("%s%s%c", times(ANSI_right, x), times(ANSI_down, y),ic);
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
+		}
+	}
+}
+// useful function, this is
+// for example:
+// str_format("hello",0,1) => "hello"
+// str_format("hello",1,1) => "a hello"
+// str_format("ohio",1,1) => "an ohio"
+// str_format("hello",2,1) => "the hello"
+// str_format("hello",0,10) => "10 hellos"
+// str_format("hello",1,10) => "10 hellos"
+// str_format("hello",2,10) => "the 10 hellos"
+// str_format("hello world",0,10) => "10 hello worlds"
+// str_format("hello of world",0,10) => "10 hellos of world"
+// str_format("foo bar of baz",0,10) => "10 foo bars of baz"
+char *str_format(char *str, int article, int quantity) {
+	char *buffer = (char *)malloc(256); // malloc so it doesn't go out of scope
+	if (quantity == 1) {
+		// singular
+		// the ternary expressions are really long and hard to understand
+		sprintf(buffer,"%s %s",(article?(article==2?"the":((str[0] == 'a' || str[0] == 'e' || str[0] == 'i' || str[0] == 'o' || str[0] == 'u')?"an":"a")):""),str);
+	} else {
+		// pluralize
+		char *plural = (char *)malloc(256);
+		char *of_sep = strstr(str," of ");
+		strcpy(plural,"");
+		*of_sep = '\0'; // cut off
+		strcat(plural,str); // put everything before the of
+		strcat(plural,"s of "); // pluralize it
+		*of_sep = ' '; // don't overall change str
+		of_sep += 4; // rest of str
+		strcat(plural,of_sep); // append rest of string
+		sprintf(buffer,"%s%d %s",article==2?"the ":"",quantity,plural);
+	}
+	return buffer;
+}
+//inventory
+int pack_items[20];
+int pack_counts[20];
+int num_pack_slots = 0;
+void add_item(int item, int quantity) { // add an item to your pack
+	char buffer[255];
+	if (is_contained_in(pack_items,20,item)) { // already exists
+		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
+		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,quantity));
+		pr_info(buffer);
+	} else { // new item
+		if (num_pack_slots == 20) {
+			pr_info("You don't have enough space in your pack.");
+		} else {
+			pack_items[num_pack_slots] = item;
+			pack_counts[num_pack_slots] = quantity;
+			num_pack_slots++;
+			sprintf(buffer,"Item #%d: %s.",num_pack_slots,str_format(ITEM_NAMES[item],1,quantity));
+			pr_info(buffer);
+		}
+	}
+}
+void del_item(int item, int quantity) { // delete items from the pack
+	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
+	if (!is_contained_in(pack_items,20,item)) {
+		pr_info("You don't have that.");
+	} else {
+		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
+			pr_info("You don't have enough of that to remove that many!");
+		} else {
+			pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
 		}
 	}
 }
@@ -275,6 +342,13 @@ int main() {
 		char keypress = getch_(0);
 		if (death) {
 			;
+		} else if (keypress == 'p') { // pick up items
+			if (items[player_y][player_x]) {
+				add_item(items[player_y][player_x],1);
+				items[player_y][player_x] = I_NOTHING;
+			} else {
+				pr_info("You see nothing to pick up.");
+			}
 		} else if (keypress == '\x1b') { // appears to be an ANSI escape sequence
 			keypress = getch_(0);
 			if (keypress == '\x5b') { // which it is!
@@ -320,7 +394,7 @@ int main() {
 		if (items[player_y][player_x]) {
 			char *iname = ITEM_NAMES[items[player_y][player_x]];
 			char tmp_s[50];
-			sprintf(tmp_s,"There is %s %s below you.",(iname[0] =='a' || iname[0] =='e' ||iname[0] =='o' || iname[0] =='i' || iname[0] =='u')?"an":"a",ITEM_NAMES[items[player_y][player_x]]);
+			sprintf(tmp_s,"There is %s below you.",str_format(iname,1,1));
 			pr_info(tmp_s);
 		}
 		// check if you've died

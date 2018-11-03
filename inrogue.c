@@ -349,6 +349,30 @@ int main() {
 			} else {
 				pr_info("You see nothing to pick up.");
 			}
+		} else if (keypress == 'u') { // use items
+			printf("%sWhich item number? ",ANSI_home);
+			int inum;
+			scanf("%d",&inum);
+			if (inum > num_pack_slots || inum < 1) {
+				pr_info("You don't have that many items.");
+			} else {
+				inum--;
+				int item = pack_items[inum];
+				if (item >= FIRST_GENERIC && item < FIRST_GENERIC+NUM_OF_IDEN_ITEMS) { // it is a generic
+					item = iden_specifics[is_contained_in(iden_generics,NUM_OF_IDEN_ITEMS,item)-1]; // make it a specific just this once
+				}
+				if (item == I_POTION_NOTHING) {
+					pr_info("Nothing happens.");
+				} else if (item == I_POTION_DEATH) {
+					pr_info("You suddenly feel like you shouldn't have drunk that.");
+					death = 1; // die
+					death_reason = "drinking something you shouldn't have";
+				} else {
+					char buffer[255];
+					sprintf(buffer,"%s? You can't use that!",str_format(ITEM_NAMES[pack_items[inum]],1,pack_counts[inum])); // use pack_items[inum] to avoid disclosing information
+					pr_info(buffer);
+				}
+			}
 		} else if (keypress == '\x1b') { // appears to be an ANSI escape sequence
 			keypress = getch_(0);
 			if (keypress == '\x5b') { // which it is!

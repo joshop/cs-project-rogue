@@ -212,12 +212,10 @@ void shuffle_rand_items() { // generates identifiable items
 			new_value = rand() % NUM_OF_IDEN_ITEMS + FIRST_GENERIC;
 		} while(is_contained_in(iden_generics, NUM_OF_IDEN_ITEMS, new_value));
 		iden_generics[i] = new_value;
-		printf("DROUS %d\n",i);
 		do {
 			new_value = rand() % NUM_OF_IDEN_ITEMS + FIRST_GENERIC + NUM_OF_IDEN_ITEMS;
 		} while(is_contained_in(iden_specifics, NUM_OF_IDEN_ITEMS, new_value));
 		iden_specifics[i] = new_value;
-		printf("CROUS %d\n",i);
 	}
 }
 void display_generic_specific() { // solely debug
@@ -262,12 +260,17 @@ char *str_format(char *str, int article, int quantity) {
 		char *plural = (char *)malloc(256);
 		char *of_sep = strstr(str," of ");
 		strcpy(plural,"");
-		*of_sep = '\0'; // cut off
-		strcat(plural,str); // put everything before the of
-		strcat(plural,"s of "); // pluralize it
-		*of_sep = ' '; // don't overall change str
-		of_sep += 4; // rest of str
-		strcat(plural,of_sep); // append rest of string
+    if (!of_sep) { // no "of", null ptr
+      strcat(plural,str);
+      strcat(plural,"s");
+    } else {
+		  *of_sep = '\0'; // cut off
+		  strcat(plural,str); // put everything before the of
+		  strcat(plural,"s of "); // pluralize it
+		  *of_sep = ' '; // don't overall change str
+		  of_sep += 4; // rest of str
+		  strcat(plural,of_sep); // append rest of string
+    }
 		sprintf(buffer,"%s%d %s",article==2?"the ":"",quantity,plural);
 	}
 	return buffer;
@@ -279,8 +282,9 @@ int num_pack_slots = 0;
 void add_item(int item, int quantity) { // add an item to your pack
 	char buffer[255];
 	if (is_contained_in(pack_items,20,item)) { // already exists
+    int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
 		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
-		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,quantity));
+		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,prev_amt+quantity));
 		pr_info(buffer);
 	} else { // new item
 		if (num_pack_slots == 20) {
@@ -320,7 +324,7 @@ int main() {
 	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
 	items[7][7] = I_POTION_GREEN;
-
+  items[7][8] = I_POTION_GREEN;
 	bool game_running = true;
 	player_x = 1;
 	player_y = 1;

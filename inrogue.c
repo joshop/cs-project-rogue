@@ -24,17 +24,21 @@
 // generic (red potion, yew wand)
 #define I_POTION_RED 1
 #define I_POTION_GREEN 2
+#define I_DEBUG_GE 3
 // specific (healing potion, lightning wand)
-#define I_POTION_DEATH 3
-#define I_POTION_NOTHING 4
+#define I_POTION_DEATH 4
+#define I_POTION_NOTHING 5
+#define I_DEBUG_SP 6
 
-#define NUM_OF_IDEN_ITEMS 2
-#define FIRST_GENERIC I_POTION_RED
+#define NUM_OF_IDEN_ITEMS 3
+#define NUM_CATS 2
 // 447135
 
 
 #define D_WIDTH 20
 #define D_HEIGHT 20
+
+int FIRST_GENERICS[] = {I_POTION_RED,I_DEBUG_GE};
 
 char *times(char *str, int reps) { // repeats a string a certain number of times.
 	char *buf = (char *)malloc(1024);
@@ -74,9 +78,9 @@ int T_COLORS[] = {WHITE,WHITE,BLUE,RED};
 int T_FLAGS[] = {0,SOLID,SOLID,0}; 
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !!!!";
-int ITEM_COLS[] = {WHITE,GREEN};
-char *ITEM_NAMES[] = {"nothing","red potion","green potion","potion of death","potion of nothing"};
+char *ITEM_CHARS = " !!*!!*";
+int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,RED,GREEN,BLUE};
+char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","potion of death","potion of nothing","DEBUG2"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 // player
@@ -107,12 +111,8 @@ int fill_tiles(int left_x, int top_y, int width, int height, int fill_with) { //
 	}
 }
 void display_dungeon(int left_x, int top_y) { 
-	// doesn't do something other than what you think it doesn't not do
-	// at a position on the display other than that not denoted by (left_x, top_y)
-	// but remember, it doesn't do something other than that
-	
-	printf("%s", ANSI_home);
-	printf("%s%s", times(ANSI_right, left_x), times(ANSI_down, top_y));
+	// DISPLAYS THE DUNGEON (wow)
+	printf("%s%s%s%s", ANSI_home, ANSI_down, times(ANSI_right, left_x), times(ANSI_down, top_y));
 	// now we're at the starting position
 	for (int i = 0; i < D_HEIGHT; i++) {
 		for (int j = 0; j < D_WIDTH; j++) {
@@ -124,7 +124,7 @@ void display_dungeon(int left_x, int top_y) {
 	}
 }
 void display_player() {
-	printf("%s", ANSI_home);
+	printf("%s%s", ANSI_home, ANSI_down); // down to skip HP bar
 	printf("%s%s", times(ANSI_right, player_x), times(ANSI_down, player_y));
 	printf("@");
 	printf("%s",times(ANSI_next,D_HEIGHT-player_y));
@@ -169,7 +169,7 @@ char getch_(int echo)
 typedef int bool;
 #define true 1;
 #define false 0;
-bool tile_flag(int tile_x, int tile_y, int test_flag) {
+bool tile_flag(int tile_x, int tile_y, int test_flag) { // retrieve tile info
 	return !!(T_FLAGS[dungeon[tile_y][tile_x]] & test_flag);
 }
 // info messages
@@ -197,7 +197,6 @@ char *death_reason;
 int iden_generics[NUM_OF_IDEN_ITEMS];
 int iden_specifics[NUM_OF_IDEN_ITEMS];
 bool is_contained_in(int arr[], int size, int val) { // is the val contained in the arr?
-	printf("checking for %d\n",val);
 	for (int idx = 0; idx < size; idx++) {
 		if (arr[idx] == val) {
 			return idx+1;
@@ -207,15 +206,20 @@ bool is_contained_in(int arr[], int size, int val) { // is the val contained in 
 }
 void shuffle_rand_items() { // generates identifiable items
 	for(int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
-		int new_value;
+		int cat_num = 0;
+		while (i+FIRST_GENERICS[0] >= FIRST_GENERICS[cat_num]) cat_num++; // find which category generic is in
+		cat_num--;
+		printf("i=%d CATEGORY: %d\n",i,cat_num);
+		int min_val = FIRST_GENERICS[cat_num]; // first item of category
+		int max_val = cat_num+1 == NUM_CATS ? NUM_OF_IDEN_ITEMS : FIRST_GENERICS[cat_num+1]-1; // last item of category
+		printf("from %d-%d\n",min_val,max_val);
+		int rand_val;
 		do {
-			new_value = rand() % NUM_OF_IDEN_ITEMS + FIRST_GENERIC;
-		} while(is_contained_in(iden_generics, NUM_OF_IDEN_ITEMS, new_value));
-		iden_generics[i] = new_value;
-		do {
-			new_value = rand() % NUM_OF_IDEN_ITEMS + FIRST_GENERIC + NUM_OF_IDEN_ITEMS;
-		} while(is_contained_in(iden_specifics, NUM_OF_IDEN_ITEMS, new_value));
-		iden_specifics[i] = new_value;
+			rand_val = rand()%(max_val-min_val+1)+min_val;
+			printf("poop %d\n",rand_val);
+		} while (is_contained_in(iden_specifics, NUM_OF_IDEN_ITEMS, rand_val+NUM_OF_IDEN_ITEMS)); // while value is already used
+		iden_generics[i] = i+FIRST_GENERICS[0]; // whichever item operating on
+		iden_specifics[i] = rand_val+NUM_OF_IDEN_ITEMS; // corresponding specific
 	}
 }
 void display_generic_specific() { // solely debug
@@ -230,8 +234,11 @@ void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 		for (int x = 0; x < D_WIDTH; x++) {
 			if (itemlist[y][x]) { // an item exists there
 				char ic = ITEM_CHARS[itemlist[y][x]];
-				printf("%s", ANSI_home);
-				printf("%s%s%c", times(ANSI_right, x), times(ANSI_down, y),ic);
+				printf("%s%s", ANSI_home, ANSI_down); // skip HP bar
+				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
+				color_set(ITEM_COLS[itemlist[y][x]]);
+				printf("%c",ic);
+				color_reset();
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
 		}
@@ -271,7 +278,11 @@ char *str_format(char *str, int article, int quantity) {
 		  of_sep += 4; // rest of str
 		  strcat(plural,of_sep); // append rest of string
     }
-		sprintf(buffer,"%s%d %s",article==2?"the ":"",quantity,plural);
+		if (quantity == 0) {
+			sprintf(buffer,"%sno %s",article==2?"the ":"",plural);
+		} else {
+			sprintf(buffer,"%s%d %s",article==2?"the ":"",quantity,plural);
+		}
 	}
 	return buffer;
 }
@@ -300,16 +311,36 @@ void add_item(int item, int quantity) { // add an item to your pack
 }
 void del_item(int item, int quantity) { // delete items from the pack
 	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
+	char buffer[255];
 	if (!is_contained_in(pack_items,20,item)) {
 		pr_info("You don't have that.");
 	} else {
 		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
 			pr_info("You don't have enough of that to remove that many!");
 		} else {
-			pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
+			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,20,item)-1]-quantity));
+			pr_info(buffer);
+			if (pack_counts[is_contained_in(pack_items,20,item)-1] == quantity) {
+				int idx_of = is_contained_in(pack_items,20,item);
+				for (int i = idx_of; i < num_pack_slots; i++) {
+					pack_items[i-1] = pack_items[i];
+					pack_counts[i-1] = pack_counts[i];
+				}
+				num_pack_slots--;
+			} else {
+				pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
+			}
 		}
 	}
 }
+void take_inventory(int empty_lines) {
+	printf("%s%sInventory: %d items\n",times(ANSI_down, empty_lines), ANSI_home,num_pack_slots);
+	for (int i = 0; i < num_pack_slots; i++) {
+		printf("Item %d: %s\n",i+1, str_format(ITEM_NAMES[pack_items[i]],1,pack_counts[i]));
+	}
+}
+int hp = 100; // hit points
+int maxhp = 100;
 int main() {
 	srand(time(NULL));
 	shuffle_rand_items();
@@ -324,7 +355,10 @@ int main() {
 	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
 	items[7][7] = I_POTION_GREEN;
-  items[7][8] = I_POTION_GREEN;
+	items[7][8] = I_POTION_GREEN;
+	items[8][7] = I_POTION_RED;
+	items[8][8] = I_POTION_RED;
+	items[9][9] = I_DEBUG_GE;
 	bool game_running = true;
 	player_x = 1;
 	player_y = 1;
@@ -332,6 +366,35 @@ int main() {
 	while (game_running) {
 		enforce_borders();
 		printf("%s",ANSI_clr);
+		// display health bar
+		int num_dash = 10*((double)hp/(double)maxhp);
+		int barcol;
+		switch (num_dash) {
+		case 0:
+		case 1:
+		case 2:
+			barcol = MAGENTA;
+			break;
+		case 3:
+		case 4:
+		case 5:
+			barcol = RED;
+			break;
+		case 6:
+		case 7:
+		case 8:
+			barcol = YELLOW;
+			break;
+		case 9:
+		case 10:
+			barcol = GREEN;
+		}
+		printf("%s", ANSI_home);
+		printf("HP: |");
+		color_set(barcol);
+		printf("%s%s",times("-",num_dash),times(" ",10-num_dash));
+		color_reset();
+		printf("|\n");
 		display_dungeon(0,0);
 		display_items(items);
 		display_player(); // display player AFTER items, so it shows as @ when you're on an item
@@ -354,6 +417,7 @@ int main() {
 				pr_info("You see nothing to pick up.");
 			}
 		} else if (keypress == 'u') { // use items
+			take_inventory(1);
 			printf("%sWhich item number? ",ANSI_home);
 			int inum;
 			scanf("%d",&inum);
@@ -362,11 +426,12 @@ int main() {
 			} else {
 				inum--;
 				int item = pack_items[inum];
-				if (item >= FIRST_GENERIC && item < FIRST_GENERIC+NUM_OF_IDEN_ITEMS) { // it is a generic
+				if (item >= FIRST_GENERICS[0] && item < FIRST_GENERICS[0]+NUM_OF_IDEN_ITEMS) { // it is a generic
 					item = iden_specifics[is_contained_in(iden_generics,NUM_OF_IDEN_ITEMS,item)-1]; // make it a specific just this once
 				}
 				if (item == I_POTION_NOTHING) {
 					pr_info("Nothing happens.");
+					del_item(pack_items[inum],1);
 				} else if (item == I_POTION_DEATH) {
 					pr_info("You suddenly feel like you shouldn't have drunk that.");
 					death = 1; // die
@@ -377,6 +442,10 @@ int main() {
 					pr_info(buffer);
 				}
 			}
+		} else if (keypress == 'i') { // take inventory
+			take_inventory(0);
+			printf("(press any key)");
+			getch_(0);
 		} else if (keypress == '\x1b') { // appears to be an ANSI escape sequence
 			keypress = getch_(0);
 			if (keypress == '\x5b') { // which it is!
@@ -426,7 +495,7 @@ int main() {
 			pr_info(tmp_s);
 		}
 		// check if you've died
-		if (death == 3) {
+		if (death == 3 || hp <= 0) { // death is for abnormal deaths
 			game_running = false;
 		} else if (death == 2) {
 			death = 3;
@@ -439,7 +508,7 @@ int main() {
 	if (death) { // did you die, or did the user quit?
 		printf("%s",ANSI_clr);
 		color_set(RED);
-		printf("GAME OVER\nYou died on level 8 of the dungeon.\nYou were killed by %s.\nPress any key to exit the game\n",death_reason);
+		printf("GAME OVER\nYou died on level POOP of the dungeon.\nYou were killed by %s.\nPress any key to exit the game\n",death_reason);
 		color_reset();
 		getch_(0);
 	}

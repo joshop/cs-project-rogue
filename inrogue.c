@@ -27,7 +27,15 @@
 #define I_POTION_DEATH 4
 #define I_POTION_NOTHING 5
 #define I_DEBUG_SP 6
-
+// neither (armor and weapons)
+#define I_ARMOR_1 7
+#define I_ARMOR_2 8
+#define I_ARMOR_3 9
+#define I_WEAPON_1 10
+#define I_WEAPON_2 11
+#define I_WEAPON_3 12
+int ARMOR_SS[] = {0,10,11,12};
+int WEAPON_SS[] = {0,10,11,12};
 #define NUM_OF_IDEN_ITEMS 3
 #define NUM_CATS 2
 // 447135
@@ -77,9 +85,9 @@ int T_COLORS[] = {WHITE,WHITE,BLUE,RED};
 int T_FLAGS[] = {0,SOLID,SOLID,0}; 
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !!*!!*";
-int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,RED,GREEN,BLUE};
-char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","potion of death","potion of nothing","DEBUG2"};
+char *ITEM_CHARS = " !!*!!*@@@";
+int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,RED,GREEN,BLUE,WHITE,WHITE,WHITE};
+char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","potion of death","potion of nothing","DEBUG2","armor 1","armor 2","armor 3"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 
@@ -278,7 +286,18 @@ void display_monsts(int monstlist[D_HEIGHT][D_WIDTH]) { // copy of items pretty 
 		}
 	}
 }
+int armor_on = 0;
+int weapon_on = 0;
+int playerStr = 10;
 int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
+	if (you) {
+		int sval = WEAPON_SS[weapon_on]-playerStr;
+		strengthAtk += weapon_on - sval>0?sval:0;
+	} else {
+		int sval = ARMOR_SS[armor_on]-playerStr;
+		strengthDef += armor_on - sval>0?sval:0;
+	}
+
 	strengthAtk += 6;
 	int missChance = (strengthAtk-strengthDef)/2;
 	int val = rand()%missChance;
@@ -392,7 +411,7 @@ void take_inventory(int empty_lines) {
 }
 int hp = 100; // hit points
 int maxhp = 100;
-int playerStr = 10;
+
 // monster ais
 void basic_monst_ai(int x, int y) {
 	if (!tile_flag(x-1,y,SOLID)) {
@@ -415,9 +434,9 @@ int main() {
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
 	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
-	items[7][7] = I_POTION_GREEN;
+	items[7][7] = I_ARMOR_1;
 	items[7][8] = I_POTION_GREEN;
-	items[8][7] = I_POTION_RED;
+	items[8][7] = I_ARMOR_2;
 	items[8][8] = I_POTION_RED;
 	items[9][9] = I_DEBUG_GE;
 	monsters[8][9] = MONSTER_BASIC;
@@ -499,12 +518,23 @@ int main() {
 					pr_info("You suddenly feel like you shouldn't have drunk that.");
 					death = 1; // die
 					death_reason = "drinking something you shouldn't have";
+				} else if (item >= I_ARMOR_1 && item <= I_ARMOR_3) {
+					if (armor_on) add_item(I_ARMOR_1-1+armor_on,1);
+					armor_on = pack_items[inum]-I_ARMOR_1+1;
+					del_item(pack_items[inum],1);
+				} else if (item >= I_WEAPON_1 && item <= I_WEAPON_3) {
+					if (weapon_on) add_item(I_WEAPON_1-1+weapon_on,1);
+					weapon_on = pack_items[inum]-I_WEAPON_1+1;
+					del_item(pack_items[inum],1);
 				} else {
 					char buffer[255];
 					sprintf(buffer,"%s? You can't use that!",str_format(ITEM_NAMES[pack_items[inum]],1,pack_counts[inum])); // use pack_items[inum] to avoid disclosing information
 					pr_info(buffer);
 				}
 			}
+		} else if (keypress == 'w') { // view wielding and wearing
+			printf("%sWearing:\n%s%s\nWearing:\n%s%s\n",ANSI_home,armor_on?ITEM_NAMES[I_ARMOR_1+armor_on-1]:"nothing",(playerStr>=ARMOR_SS[armor_on])?"":" (heavy)",weapon_on?ITEM_NAMES[I_WEAPON_1+weapon_on-1]:"nothing",(playerStr>=WEAPON_SS[weapon_on])?"":" (heavy)");
+			getch_(0);
 		} else if (keypress == 'i') { // take inventory
 			take_inventory(0);
 			printf("(press any key)");

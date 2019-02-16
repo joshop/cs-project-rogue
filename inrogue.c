@@ -1,5 +1,3 @@
-// i sawed this boat in half
-// and fixed it using only flex tape
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,7 +11,7 @@
 #define MAGENTA 35
 #define CYAN 36
 #define WHITE 37
-#define DEFAULT_COL WHITE
+#define DEFAULT_COL BLACK
 // tile nums
 #define T_AIR 0
 #define T_WALL 1
@@ -34,7 +32,8 @@
 #define NUM_CATS 2
 // 447135
 #define MONSTER_BASIC 1
-
+int MONST_STRS[] = {0,10};
+int MONST_MAX[] = {0,20};
 #define D_WIDTH 20
 #define D_HEIGHT 20
 
@@ -94,6 +93,7 @@ bool tile_flag(int tile_x, int tile_y, int test_flag) { // retrieve tile info
 
 // monsters
 int monsters[D_WIDTH][D_HEIGHT];
+int mdamages[D_WIDTH][D_HEIGHT];
 char *MONST_CHARS = " B";
 int MONST_COLS[] = {WHITE,RED};
 char *MONST_NAMES[] = {"","random thing"};
@@ -205,6 +205,9 @@ bool important_msg = false;
 char *death_reason;
 int iden_generics[NUM_OF_IDEN_ITEMS];
 int iden_specifics[NUM_OF_IDEN_ITEMS];
+bool near(int ax, int ay, int bx, int by) {
+	return (ax == bx && abs(ay-by)==1) || (ay == by && abs(ax-bx)==1);
+}
 bool is_contained_in(int arr[], int size, int val) { // is the val contained in the arr?
 	for (int idx = 0; idx < size; idx++) {
 		if (arr[idx] == val) {
@@ -257,6 +260,13 @@ void display_monsts(int monstlist[D_HEIGHT][D_WIDTH]) { // copy of items pretty 
 	for (int y = 0; y < D_HEIGHT; y++) {
 		for (int x = 0; x < D_WIDTH; x++) {
 			if (monstlist[y][x]) { // a monster exists there
+				// scan for dead monsters also
+				if (mdamages[y][x] >= MONST_MAX[monstlist[y][x]]) {
+					char buf[256];
+					sprintf(buf,"The %s dies!",MONST_NAMES[monstlist[y][x]]);
+					pr_info(buf);
+					monstlist[y][x] = 0;
+				}
 				char mc = MONST_CHARS[monstlist[y][x]];
 				printf("%s%s", ANSI_home, ANSI_down); // skip HP bar
 				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
@@ -266,6 +276,22 @@ void display_monsts(int monstlist[D_HEIGHT][D_WIDTH]) { // copy of items pretty 
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
 		}
+	}
+}
+int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
+	strengthAtk += 6;
+	int missChance = (strengthAtk-strengthDef)/2;
+	int val = rand()%missChance;
+	char theName[100];
+	sprintf(theName,"The %s",monstName);
+	if (val) { // hit
+		sprintf(theName,"%s hit%s!",you?"You":theName,you?"":"s");
+		pr_info(theName);
+		return val*strengthAtk/(strengthDef/4);
+	} else { // miss
+		sprintf(theName,"%s miss%s!",you?"You":theName,you?"":"es");
+		pr_info(theName);
+		return 0;
 	}
 }
 // useful function, this is
@@ -366,15 +392,15 @@ void take_inventory(int empty_lines) {
 }
 int hp = 100; // hit points
 int maxhp = 100;
+int playerStr = 10;
 // monster ais
 void basic_monst_ai(int x, int y) {
-	if (!tile_flag(x,y-1,SOLID)) {
-	monsters[x][y-1] = MONSTER_BASIC;
-	monsters[x][y] = 0;
+	if (!tile_flag(x-1,y,SOLID)) {
+	monsters[y][x-1] = MONSTER_BASIC;
+	monsters[y][x] = 0;
 	}
-	if (player_x == y && player_y == x-1) {
-		pr_info("The random thing attacks you!");
-		hp -= 50;
+	if (near(x, y, player_x, player_y)) {
+		hp -= attack(10, playerStr, "random thing", 0);
 		death_reason = "a random thing";
 	}
 }
@@ -386,10 +412,7 @@ int main() {
 	printf("%s",ANSI_clr);
 	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
-	if (fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR)) {
-		printc("ERROR: initial airfill failed!\n",RED);
-		return 1;
-	}
+	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
 	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
 	items[7][7] = I_POTION_GREEN;
@@ -492,16 +515,20 @@ int main() {
 				keypress = getch_(0); // meat of the escape sequence
 				switch (keypress) {
 					case 'A': // up arrow
-					if (!tile_flag(player_x, player_y - 1, SOLID)) player_y--;
+					if (monsters[player_y-1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y-1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x, player_y - 1, SOLID)) player_y--;
 					break;
 					case 'B': // down arrow
-					if (!tile_flag(player_x, player_y + 1, SOLID)) player_y++;
+					if (monsters[player_y+1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y+1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x, player_y + 1, SOLID)) player_y++;
 					break;
 					case 'C': // right arrow
-					if (!tile_flag(player_x + 1, player_y, SOLID)) player_x++;
+					if (monsters[player_y][player_x+1]) mdamages[player_y][player_x+1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x+1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x + 1, player_y, SOLID)) player_x++;
 					break;
 					case 'D': // left arrow
-					if (!tile_flag(player_x - 1, player_y, SOLID)) player_x--;
+					if (monsters[player_y][player_x-1]) mdamages[player_y][player_x-1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x-1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x - 1, player_y, SOLID)) player_x--;
 					break;
 				}
 			} else if (keypress == '\x1b') { // ...or the user pressed ESC
@@ -549,7 +576,7 @@ int main() {
 			for (int j = 0; j < D_WIDTH; j++) {
 				int x = monsters[i][j];
 				if (x) {
-					(*MONST_AIS[x])(i,j); // function pointers are weird
+					(*MONST_AIS[x])(j,i); // function pointers are weird
 				}
 			}
 		}

@@ -33,7 +33,7 @@
 #define NUM_OF_IDEN_ITEMS 3
 #define NUM_CATS 2
 // 447135
-
+#define MONSTER_BASIC 1
 
 #define D_WIDTH 20
 #define D_HEIGHT 20
@@ -83,6 +83,21 @@ int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,RED,GREEN,BLUE};
 char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","potion of death","potion of nothing","DEBUG2"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
+
+// just some bools to make life easier
+typedef int bool;
+#define true 1;
+#define false 0;
+bool tile_flag(int tile_x, int tile_y, int test_flag) { // retrieve tile info
+	return !!(T_FLAGS[dungeon[tile_y][tile_x]] & test_flag);
+}
+
+// monsters
+int monsters[D_WIDTH][D_HEIGHT];
+char *MONST_CHARS = " B";
+int MONST_COLS[] = {WHITE,RED};
+char *MONST_NAMES[] = {"","random thing"};
+
 // player
 int player_x;
 int player_y;
@@ -165,13 +180,7 @@ char getch_(int echo)
 }
 
 // back to our stuff
-// just some bools to make life easier
-typedef int bool;
-#define true 1;
-#define false 0;
-bool tile_flag(int tile_x, int tile_y, int test_flag) { // retrieve tile info
-	return !!(T_FLAGS[dungeon[tile_y][tile_x]] & test_flag);
-}
+
 // info messages
 char *infos[5] = {"-","-","-","-","-"};
 void pr_info(char *msg) {
@@ -238,6 +247,21 @@ void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
 				color_set(ITEM_COLS[itemlist[y][x]]);
 				printf("%c",ic);
+				color_reset();
+				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
+			}
+		}
+	}
+}
+void display_monsts(int monstlist[D_HEIGHT][D_WIDTH]) { // copy of items pretty much
+	for (int y = 0; y < D_HEIGHT; y++) {
+		for (int x = 0; x < D_WIDTH; x++) {
+			if (monstlist[y][x]) { // a monster exists there
+				char mc = MONST_CHARS[monstlist[y][x]];
+				printf("%s%s", ANSI_home, ANSI_down); // skip HP bar
+				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
+				color_set(MONST_COLS[monstlist[y][x]]);
+				printf("%c",mc);
 				color_reset();
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
@@ -311,6 +335,7 @@ void add_item(int item, int quantity) { // add an item to your pack
 }
 void del_item(int item, int quantity) { // delete items from the pack
 	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
+	// i think it works now (?)
 	char buffer[255];
 	if (!is_contained_in(pack_items,20,item)) {
 		pr_info("You don't have that.");
@@ -341,6 +366,19 @@ void take_inventory(int empty_lines) {
 }
 int hp = 100; // hit points
 int maxhp = 100;
+// monster ais
+void basic_monst_ai(int x, int y) {
+	if (!tile_flag(x,y-1,SOLID)) {
+	monsters[x][y-1] = MONSTER_BASIC;
+	monsters[x][y] = 0;
+	}
+	if (player_x == y && player_y == x-1) {
+		pr_info("The random thing attacks you!");
+		hp -= 50;
+		death_reason = "a random thing";
+	}
+}
+void (*MONST_AIS[])(int x, int y) = {basic_monst_ai,basic_monst_ai};
 int main() {
 	srand(time(NULL));
 	shuffle_rand_items();
@@ -359,6 +397,7 @@ int main() {
 	items[8][7] = I_POTION_RED;
 	items[8][8] = I_POTION_RED;
 	items[9][9] = I_DEBUG_GE;
+	monsters[8][9] = MONSTER_BASIC;
 	bool game_running = true;
 	player_x = 1;
 	player_y = 1;
@@ -397,6 +436,7 @@ int main() {
 		printf("|\n");
 		display_dungeon(0,0);
 		display_items(items);
+		display_monsts(monsters);
 		display_player(); // display player AFTER items, so it shows as @ when you're on an item
 		// print messages
 		for (int i = 0; i < 5; i++) {
@@ -495,14 +535,23 @@ int main() {
 			pr_info(tmp_s);
 		}
 		// check if you've died
-		if (death == 3 || hp <= 0) { // death is for abnormal deaths
+		if (death == 3 ) {
 			game_running = false;
 		} else if (death == 2) {
 			death = 3;
 			pr_info("You died.");
 			important_msg = true;
-		} else if (death == 1) {
+		} else if (death == 1 || hp <= 0) { // death is for abnormal deaths
 			death = 2;
+		}
+		// update monster ais
+		for (int i = 0; i < D_HEIGHT; i++) {
+			for (int j = 0; j < D_WIDTH; j++) {
+				int x = monsters[i][j];
+				if (x) {
+					(*MONST_AIS[x])(i,j); // function pointers are weird
+				}
+			}
 		}
 	}
 	if (death) { // did you die, or did the user quit?

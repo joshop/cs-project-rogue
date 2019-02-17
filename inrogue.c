@@ -15,29 +15,80 @@
 // tile nums
 #define T_AIR 0
 #define T_WALL 1
-#define T_BORDER 2 // solid wall at the edge of map
+#define T_BORDER 2
 #define T_LAVA 3
+#define T_LASTPH 4
+// other plants continue from here
+char *plantName(int id) {
+	// leaf twig stem root fruit
+	char *s = (char *)malloc(20);
+	if (id == 5) s = "grass";
+	else {
+		char *a;
+		int z = (id-5)/5;
+		if (z == 0) a = "alpha";
+		if (z == 1) a = "beta";
+		if (z == 2) a = "gamma";
+		if (z == 3) a = "delta";
+		if (z == 4) a = "epsilon";
+		if (z == 5) a = "zeta";
+		if (z == 6) a = "eta";
+		if (z == 7) a = "theta";
+		if (z == 8) a = "iota";
+		if (z == 9) a = "kappa";
+		if (z == 10) a = "lambda";
+		if (z == 11) a = "mu";
+		if (z == 12) a = "nu";
+		if (z == 13) a = "xi";
+		if (z == 14) a = "omicron";
+		if (z == 15) a = "pi";
+		if (z == 16) a = "rho";
+		if (z == 17) a = "sigma";
+		if (z == 18) a = "tau";
+		if (z == 19) a = "upsilon";
+		if (z == 20) a = "phi";
+		if (z == 21) a = "hi";
+		if (z == 22) a = "psi";
+		if (z == 23) a = "omega";
+		z = (id-5)%5;
+		strcat(s,a);
+		if (z == 0) a = "leaf";
+		if (z == 1) a = "twig";
+		if (z == 2) a = "stem";
+		if (z == 3) a = "root";
+		if (z == 4) a = "fruit";
+		strcat(s,a);
+	} return s;
+}
 // item nums
 #define I_NOTHING 0
 // generic (red potion, yew wand)
 #define I_POTION_RED 1
 #define I_POTION_GREEN 2
 #define I_DEBUG_GE 3
+#define I_SCROLL_A 4
+#define I_SCROLL_B 5
 // specific (healing potion, lightning wand)
-#define I_POTION_DEATH 4
-#define I_POTION_NOTHING 5
-#define I_DEBUG_SP 6
+#define I_POTION_DEATH 6
+#define I_POTION_NOTHING 7
+#define I_DEBUG_SP 8
+#define I_SCROLL_ENCH 9
+#define I_SCROLL_BOIL 10
 // neither (armor and weapons)
-#define I_ARMOR_1 7
-#define I_ARMOR_2 8
-#define I_ARMOR_3 9
-#define I_WEAPON_1 10
-#define I_WEAPON_2 11
-#define I_WEAPON_3 12
+#define I_ARMOR_1 11
+#define I_ARMOR_2 12
+#define I_ARMOR_3 13
+#define I_WEAPON_1 14
+#define I_WEAPON_2 15
+#define I_WEAPON_3 16
+// conditions
+#define COND_NULL 0
+#define COND_POISON 1
+#define COND_NOMOVE 2
 int ARMOR_SS[] = {0,10,11,12};
 int WEAPON_SS[] = {0,10,11,12};
-#define NUM_OF_IDEN_ITEMS 3
-#define NUM_CATS 2
+#define NUM_OF_IDEN_ITEMS 5
+#define NUM_CATS 3
 // 447135
 #define MONSTER_BASIC 1
 int MONST_STRS[] = {0,10};
@@ -45,7 +96,7 @@ int MONST_MAX[] = {0,20};
 #define D_WIDTH 20
 #define D_HEIGHT 20
 
-int FIRST_GENERICS[] = {I_POTION_RED,I_DEBUG_GE};
+int FIRST_GENERICS[] = {I_POTION_RED,I_DEBUG_GE,I_SCROLL_A,I_POTION_DEATH};
 
 char *times(char *str, int reps) { // repeats a string a certain number of times.
 	char *buf = (char *)malloc(1024);
@@ -79,15 +130,26 @@ char *ANSI_scr_up = "\x1b\x5b""S";
 char *ANSI_scr_down = "\x1b\x5b""T";
 char *ANSI_home = "\x1b\x5b""H";
 // tileset
-char TILES[] = " ##:";
-int T_COLORS[] = {WHITE,WHITE,BLUE,RED};
+char TILES[256] = " ##:!";
+int T_COLORS[256] = {WHITE,WHITE,BLUE,RED,YELLOW};
 #define SOLID 1
-int T_FLAGS[] = {0,SOLID,SOLID,0}; 
+#define PLANT 2
+int T_FLAGS[256] = {0,SOLID,SOLID,0,SOLID};
+char *T_NAMES[256] = {"air","wall","solid wall","lava","ERROR!*^%!@&#^%!@#qwertyuio"};
+void initPlants() {
+	for (int i = T_LASTPH; i<T_LASTPH+121; i++) {
+		/*TILES[i] = "\"";
+		T_COLORS[i] = GREEN;
+		T_FLAGS[i] = PLANT;
+		T_NAMES[i] = plantName(i);*/
+	}
+}
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !!*!!*@@@";
-int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,RED,GREEN,BLUE,WHITE,WHITE,WHITE};
-char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","potion of death","potion of nothing","DEBUG2","armor 1","armor 2","armor 3"};
+int enchs[D_WIDTH][D_HEIGHT];
+char *ITEM_CHARS = " !!*~~!!*~~@@@";
+int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,WHITE,WHITE,RED,GREEN,BLUE,WHITE,WHITE,WHITE,WHITE,WHITE};
+char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","scroll entitled 'A'","scroll entitled 'B'","potion of death","potion of nothing","DEBUG2","scroll of enchantment","scroll of boiling","armor 1","armor 2","armor 3"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 
@@ -227,7 +289,10 @@ bool is_contained_in(int arr[], int size, int val) { // is the val contained in 
 void shuffle_rand_items() { // generates identifiable items
 	for(int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
 		int cat_num = 0;
-		while (i+FIRST_GENERICS[0] >= FIRST_GENERICS[cat_num]) cat_num++; // find which category generic is in
+		while (i+FIRST_GENERICS[0] >= FIRST_GENERICS[cat_num]) {
+			printf("yeah we have %d in %d\n",FIRST_GENERICS[cat_num],cat_num);
+			cat_num++; // find which category generic is in
+		}
 		cat_num--;
 		printf("i=%d CATEGORY: %d\n",i,cat_num);
 		int min_val = FIRST_GENERICS[cat_num]; // first item of category
@@ -288,20 +353,38 @@ void display_monsts(int monstlist[D_HEIGHT][D_WIDTH]) { // copy of items pretty 
 }
 int armor_on = 0;
 int weapon_on = 0;
+int weapon_en = 0;
+int armor_en = 0;
 int playerStr = 10;
+int conds[10];
+int numconds = 0;
+void applyCond(int cond) {
+	conds[numconds] = cond;
+	numconds++;
+}
+void remCond(int cond) {
+	int loc = is_contained_in(conds, numconds, cond)-1;
+	conds[loc] = COND_NULL;
+	while (conds[numconds] == COND_NULL) numconds--;
+}
 int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 	if (you) {
-		int sval = WEAPON_SS[weapon_on]-playerStr;
-		strengthAtk += weapon_on - sval>0?sval:0;
+		int sval = WEAPON_SS[weapon_on]-playerStr-weapon_en;
+		int mod = weapon_on - sval>0?sval:0;
+		int ench = weapon_en*2;
+		strengthAtk += mod+ench;
 	} else {
-		int sval = ARMOR_SS[armor_on]-playerStr;
-		strengthDef += armor_on - sval>0?sval:0;
+		int sval = ARMOR_SS[armor_on]-playerStr-armor_en;
+		int mod = armor_on - ((sval>0)?sval:0);
+		int ench = armor_en*2;
+		printf("b4 sval %d mod %d ench %d startdef %d\n",sval,mod,ench,strengthDef);
+		strengthDef += mod+ench;
 	}
-
 	strengthAtk += 6;
 	int missChance = (strengthAtk-strengthDef)/2;
 	int val = rand()%missChance;
 	char theName[100];
+	printf("atk %d def %d yay\n",strengthAtk,strengthDef);
 	sprintf(theName,"The %s",monstName);
 	if (val) { // hit
 		sprintf(theName,"%s hit%s!",you?"You":theName,you?"":"s");
@@ -358,8 +441,9 @@ char *str_format(char *str, int article, int quantity) {
 //inventory
 int pack_items[20];
 int pack_counts[20];
+int pack_enchs[20];
 int num_pack_slots = 0;
-void add_item(int item, int quantity) { // add an item to your pack
+void add_item(int item, int quantity, int ench) { // add an item to your pack
 	char buffer[255];
 	if (is_contained_in(pack_items,20,item)) { // already exists
     int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
@@ -372,6 +456,7 @@ void add_item(int item, int quantity) { // add an item to your pack
 		} else {
 			pack_items[num_pack_slots] = item;
 			pack_counts[num_pack_slots] = quantity;
+			pack_enchs[num_pack_slots] = ench;
 			num_pack_slots++;
 			sprintf(buffer,"Item #%d: %s.",num_pack_slots,str_format(ITEM_NAMES[item],1,quantity));
 			pr_info(buffer);
@@ -432,6 +517,7 @@ int main() {
 	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
+	initPlants();
 	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
 	items[7][7] = I_ARMOR_1;
@@ -439,6 +525,8 @@ int main() {
 	items[8][7] = I_ARMOR_2;
 	items[8][8] = I_POTION_RED;
 	items[9][9] = I_DEBUG_GE;
+	items[10][10] = I_SCROLL_A;
+	items[10][11] = I_SCROLL_B;
 	monsters[8][9] = MONSTER_BASIC;
 	bool game_running = true;
 	player_x = 1;
@@ -493,7 +581,7 @@ int main() {
 			;
 		} else if (keypress == 'p') { // pick up items
 			if (items[player_y][player_x]) {
-				add_item(items[player_y][player_x],1);
+				add_item(items[player_y][player_x],1,enchs[player_y][player_x]);
 				items[player_y][player_x] = I_NOTHING;
 			} else {
 				pr_info("You see nothing to pick up.");
@@ -519,13 +607,47 @@ int main() {
 					death = 1; // die
 					death_reason = "drinking something you shouldn't have";
 				} else if (item >= I_ARMOR_1 && item <= I_ARMOR_3) {
-					if (armor_on) add_item(I_ARMOR_1-1+armor_on,1);
+					if (armor_on) {
+						if (armor_en < 0) pr_info("You can't remove the cursed armor you're wearing..."); else
+						add_item(I_ARMOR_1-1+armor_on,1,armor_en);
+					}
 					armor_on = pack_items[inum]-I_ARMOR_1+1;
+					armor_en = pack_enchs[inum];
 					del_item(pack_items[inum],1);
 				} else if (item >= I_WEAPON_1 && item <= I_WEAPON_3) {
-					if (weapon_on) add_item(I_WEAPON_1-1+weapon_on,1);
+					if (weapon_on) {
+						if (weapon_en < 0) pr_info("You can't put down the cursed weapon you're wielding..."); else
+						add_item(I_WEAPON_1-1+weapon_on,1,weapon_en);
+					}
 					weapon_on = pack_items[inum]-I_WEAPON_1+1;
+					weapon_en = pack_enchs[inum];
 					del_item(pack_items[inum],1);
+				} else if (item == I_SCROLL_ENCH) {
+					pr_info("You recite the words on this old scroll...");
+					take_inventory(1);
+					int scrench = pack_enchs[inum];
+					del_item(pack_items[inum],1);
+					printf("%sThis is a scroll of enchantment. What to enchant?",ANSI_home);
+					scanf("%d",&inum);
+					if (scrench < 0) {
+						pr_info("The scroll, being cursed, disintegrates in your hands and has no effect.");
+					} else {
+					pack_enchs[inum]++;
+					if (!pack_enchs[inum]) {
+						pr_info("You feel an evil energy dissipate with the use of this scroll.");
+					}
+					if (scrench) {
+						pr_info("The scroll, being blessed, adds its magical energy to the item being enchanted.");
+						pack_enchs[inum]++;
+						if (!pack_enchs[inum]) {
+							pr_info("You feel an evil energy dissipate with the use of this scroll.");
+						}
+					}
+					}
+				} else if (item == I_SCROLL_BOIL) {
+					pr_info("You recite the words on this old scroll...");
+					pr_info("Is it just you, or does something feel warm around here?");
+					dungeon[player_y][player_x] = T_LAVA;
 				} else {
 					char buffer[255];
 					sprintf(buffer,"%s? You can't use that!",str_format(ITEM_NAMES[pack_items[inum]],1,pack_counts[inum])); // use pack_items[inum] to avoid disclosing information
@@ -545,19 +667,23 @@ int main() {
 				keypress = getch_(0); // meat of the escape sequence
 				switch (keypress) {
 					case 'A': // up arrow
-					if (monsters[player_y-1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y-1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
+					else if (monsters[player_y-1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y-1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
 					else if (!tile_flag(player_x, player_y - 1, SOLID)) player_y--;
 					break;
 					case 'B': // down arrow
-					if (monsters[player_y+1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y+1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
+					else if (monsters[player_y+1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y+1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
 					else if (!tile_flag(player_x, player_y + 1, SOLID)) player_y++;
 					break;
 					case 'C': // right arrow
-					if (monsters[player_y][player_x+1]) mdamages[player_y][player_x+1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x+1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
+					else if (monsters[player_y][player_x+1]) mdamages[player_y][player_x+1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x+1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
 					else if (!tile_flag(player_x + 1, player_y, SOLID)) player_x++;
 					break;
 					case 'D': // left arrow
-					if (monsters[player_y][player_x-1]) mdamages[player_y][player_x-1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x-1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
+					else if (monsters[player_y][player_x-1]) mdamages[player_y][player_x-1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x-1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
 					else if (!tile_flag(player_x - 1, player_y, SOLID)) player_x--;
 					break;
 				}

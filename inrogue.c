@@ -65,30 +65,39 @@ char *plantName(int id) {
 // generic (red potion, yew wand)
 #define I_POTION_RED 1
 #define I_POTION_GREEN 2
-#define I_DEBUG_GE 3
-#define I_SCROLL_A 4
-#define I_SCROLL_B 5
+#define I_POTION_BLUE 3
+#define I_POTION_YELLOW 4
+#define I_POTION_ORANGE 5
+#define I_POTION_PURPLE 6
+#define I_POTION_CYAN 7
+#define I_POTION_MAGENTA 8
+#define I_POTION_WHITE 9
+#define I_POTION_BLACK 10
 // specific (healing potion, lightning wand)
-#define I_POTION_DEATH 6
-#define I_POTION_NOTHING 7
-#define I_DEBUG_SP 8
-#define I_SCROLL_ENCH 9
-#define I_SCROLL_BOIL 10
+// potions are named by BLESSED effect
+#define I_POTION_HEAL 11
+#define I_POTION_SPEED 12
+#define I_POTION_INVIS 13
+#define I_POTION_STRENGTH 14
+#define I_POTION_MAXHP 15
+#define I_POTION_FIREP 16
+#define I_POTION_COLDP 17
+#define I_POTION_GHOST 18
+#define I_POTION_REGEN 19
+#define I_POTION_CURE 20
+#define I_SCROLL_ENCH 666
 // neither (armor and weapons)
-#define I_ARMOR_1 11
-#define I_ARMOR_2 12
-#define I_ARMOR_3 13
-#define I_WEAPON_1 14
-#define I_WEAPON_2 15
-#define I_WEAPON_3 16
+#define I_ARMOR_1 667
+#define I_WEAPON_1 668
+#define I_FOOD 669
 // conditions
 #define COND_NULL 0
 #define COND_POISON 1
 #define COND_NOMOVE 2
 int ARMOR_SS[] = {0,10,11,12};
 int WEAPON_SS[] = {0,10,11,12};
-#define NUM_OF_IDEN_ITEMS 5
-#define NUM_CATS 3
+#define NUM_OF_IDEN_ITEMS 10
+#define NUM_CATS 1
 // 447135
 #define MONSTER_BASIC 1
 int MONST_STRS[] = {0,10};
@@ -96,7 +105,7 @@ int MONST_MAX[] = {0,20};
 #define D_WIDTH 20
 #define D_HEIGHT 20
 
-int FIRST_GENERICS[] = {I_POTION_RED,I_DEBUG_GE,I_SCROLL_A,I_POTION_DEATH};
+int FIRST_GENERICS[] = {I_POTION_RED,I_POTION_HEAL};
 
 char *times(char *str, int reps) { // repeats a string a certain number of times.
 	char *buf = (char *)malloc(1024);
@@ -147,9 +156,9 @@ void initPlants() {
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
 int enchs[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !!*~~!!*~~@@@";
-int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,WHITE,WHITE,RED,GREEN,BLUE,WHITE,WHITE,WHITE,WHITE,WHITE};
-char *ITEM_NAMES[] = {"nothing","red potion","green potion","DEBUG","scroll entitled 'A'","scroll entitled 'B'","potion of death","potion of nothing","DEBUG2","scroll of enchantment","scroll of boiling","armor 1","armor 2","armor 3"};
+char *ITEM_CHARS = " !!!!!!!!!!!!!!!!!!!!";
+int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE};
+char *ITEM_NAMES[] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 
@@ -314,10 +323,20 @@ void display_generic_specific() { // solely debug
 		color_reset();
 	}
 }
+// identification
+int known_things[200];
+int num_known = 0;
+void learn(int thing) {
+	known_things[num_known++] = thing;
+}
 void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 	for (int y = 0; y < D_HEIGHT; y++) {
 		for (int x = 0; x < D_WIDTH; x++) {
 			if (itemlist[y][x]) { // an item exists there
+				// scan for iden items
+				if (is_contained_in(known_things, num_known, itemlist[y][x])) {
+					itemlist[y][x] = iden_specifics[is_contained_in(iden_generics, NUM_OF_IDEN_ITEMS, itemlist[y][x])-1];
+				}
 				char ic = ITEM_CHARS[itemlist[y][x]];
 				printf("%s%s", ANSI_home, ANSI_down); // skip HP bar
 				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
@@ -377,14 +396,12 @@ int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 		int sval = ARMOR_SS[armor_on]-playerStr-armor_en;
 		int mod = armor_on - ((sval>0)?sval:0);
 		int ench = armor_en*2;
-		printf("b4 sval %d mod %d ench %d startdef %d\n",sval,mod,ench,strengthDef);
 		strengthDef += mod+ench;
 	}
 	strengthAtk += 6;
 	int missChance = (strengthAtk-strengthDef)/2;
 	int val = rand()%missChance;
 	char theName[100];
-	printf("atk %d def %d yay\n",strengthAtk,strengthDef);
 	sprintf(theName,"The %s",monstName);
 	if (val) { // hit
 		sprintf(theName,"%s hit%s!",you?"You":theName,you?"":"s");
@@ -408,34 +425,48 @@ int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 // str_format("hello world",0,10) => "10 hello worlds"
 // str_format("hello of world",0,10) => "10 hellos of world"
 // str_format("foo bar of baz",0,10) => "10 foo bars of baz"
-char *str_format(char *str, int article, int quantity) {
+char *str_format(char *str_pl, int article, int quantity) {
+	printf("hello how may i help you %s %d and %d\n",str_pl,article,quantity);
+	char str[256];
+	strcpy(str,str_pl); // incase we used a literal so we cant edit
 	char *buffer = (char *)malloc(256); // malloc so it doesn't go out of scope
 	if (quantity == 1) {
 		// singular
 		// the ternary expressions are really long and hard to understand
 		sprintf(buffer,"%s %s",(article?(article==2?"the":((str[0] == 'a' || str[0] == 'e' || str[0] == 'i' || str[0] == 'o' || str[0] == 'u')?"an":"a")):""),str);
 	} else {
+		printf("ah i see\n");
 		// pluralize
 		char *plural = (char *)malloc(256);
 		char *of_sep = strstr(str," of ");
 		strcpy(plural,"");
+	printf("doin good so far\n");
     if (!of_sep) { // no "of", null ptr
+    	printf("ok well this is pretty boring\n");
       strcat(plural,str);
       strcat(plural,"s");
     } else {
+    	printf("in that case here we are \n");
 		  *of_sep = '\0'; // cut off
+		  printf("EVERTHNNG IS OING ACCORDING TO PLAN %s\n",str);
 		  strcat(plural,str); // put everything before the of
+		  printf("STEP ONE %s\n",plural);
 		  strcat(plural,"s of "); // pluralize it
+		  printf("STEP ONE %s\n",plural);
 		  *of_sep = ' '; // don't overall change str
 		  of_sep += 4; // rest of str
 		  strcat(plural,of_sep); // append rest of string
+		  printf("STEP ONE %s\n",plural);
     }
 		if (quantity == 0) {
+			printf("ok almost here\n");
 			sprintf(buffer,"%sno %s",article==2?"the ":"",plural);
+			printf("what do we have here? its %s\n",buffer);
 		} else {
 			sprintf(buffer,"%s%d %s",article==2?"the ":"",quantity,plural);
 		}
 	}
+	printf("k so were done here bye\n");
 	return buffer;
 }
 //inventory
@@ -467,22 +498,34 @@ void del_item(int item, int quantity) { // delete items from the pack
 	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
 	// i think it works now (?)
 	char buffer[255];
+	printf("attempting to delete item %d (%d count)\n",item,quantity);
 	if (!is_contained_in(pack_items,20,item)) {
 		pr_info("You don't have that.");
+		printf("error code 666\n");
 	} else {
+		printf("error code FRED\n");
+		printf("lets see uh we have it here %d\n",is_contained_in(pack_items,20,item));
+		printf("and uh so yeah that means we have %d\n",pack_counts[is_contained_in(pack_items,20,item)-1]);
 		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
 			pr_info("You don't have enough of that to remove that many!");
+			printf("error code rous\n");
 		} else {
+			printf("on the other hand its called a um \"%s\"\n",ITEM_NAMES[item]);
+			printf("so from what i can tell this is not an error but %d\n",pack_counts[is_contained_in(pack_items,20,item)-1]-quantity);
 			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,20,item)-1]-quantity));
+			printf("non zero exit code\n");
 			pr_info(buffer);
 			if (pack_counts[is_contained_in(pack_items,20,item)-1] == quantity) {
+				printf("non zero exit code 2\n");
 				int idx_of = is_contained_in(pack_items,20,item);
 				for (int i = idx_of; i < num_pack_slots; i++) {
+					printf("error is here\n");
 					pack_items[i-1] = pack_items[i];
 					pack_counts[i-1] = pack_counts[i];
 				}
 				num_pack_slots--;
 			} else {
+				printf("non zero exit code 3\n");
 				pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
 			}
 		}
@@ -520,14 +563,12 @@ int main() {
 	initPlants();
 	// placeholder for dungeon gen
 	dungeon[6][6] = T_LAVA;
-	items[7][7] = I_ARMOR_1;
 	items[7][8] = I_POTION_GREEN;
-	items[8][7] = I_ARMOR_2;
 	items[8][8] = I_POTION_RED;
-	items[9][9] = I_DEBUG_GE;
-	items[10][10] = I_SCROLL_A;
-	items[10][11] = I_SCROLL_B;
+	items[9][8] = I_POTION_HEAL;
+	enchs[9][8] = 2;
 	monsters[8][9] = MONSTER_BASIC;
+	learn(I_POTION_RED);
 	bool game_running = true;
 	player_x = 1;
 	player_y = 1;
@@ -599,14 +640,22 @@ int main() {
 				if (item >= FIRST_GENERICS[0] && item < FIRST_GENERICS[0]+NUM_OF_IDEN_ITEMS) { // it is a generic
 					item = iden_specifics[is_contained_in(iden_generics,NUM_OF_IDEN_ITEMS,item)-1]; // make it a specific just this once
 				}
-				if (item == I_POTION_NOTHING) {
-					pr_info("Nothing happens.");
+				if (item == I_POTION_HEAL) {
+					printf("see this my code works! yay\n");
+					if (pack_enchs[inum] == 0) { // uncursed
+						printf("see this my code works! yay\n");
+						pr_info("You feel... nothing.");
+					} else if (pack_enchs[inum] > 0) {
+						printf("see this my code works! yay\n");printf("see this my code works! yay\n");
+						pr_info("You feel healthier!");
+						hp = maxhp;
+					} else {
+						printf("see this my code works! yay\n");printf("see this my code works! yay\n");printf("see this my code works! yay\n");
+						pr_info("Acid spills from the bottle!");
+						hp /= 2;
+					}
 					del_item(pack_items[inum],1);
-				} else if (item == I_POTION_DEATH) {
-					pr_info("You suddenly feel like you shouldn't have drunk that.");
-					death = 1; // die
-					death_reason = "drinking something you shouldn't have";
-				} else if (item >= I_ARMOR_1 && item <= I_ARMOR_3) {
+				} else if (item >= I_ARMOR_1 && item <= I_WEAPON_1) {
 					if (armor_on) {
 						if (armor_en < 0) pr_info("You can't remove the cursed armor you're wearing..."); else
 						add_item(I_ARMOR_1-1+armor_on,1,armor_en);
@@ -614,7 +663,7 @@ int main() {
 					armor_on = pack_items[inum]-I_ARMOR_1+1;
 					armor_en = pack_enchs[inum];
 					del_item(pack_items[inum],1);
-				} else if (item >= I_WEAPON_1 && item <= I_WEAPON_3) {
+				} else if (item >= I_WEAPON_1 && item <= I_FOOD) {
 					if (weapon_on) {
 						if (weapon_en < 0) pr_info("You can't put down the cursed weapon you're wielding..."); else
 						add_item(I_WEAPON_1-1+weapon_on,1,weapon_en);
@@ -632,22 +681,18 @@ int main() {
 					if (scrench < 0) {
 						pr_info("The scroll, being cursed, disintegrates in your hands and has no effect.");
 					} else {
-					pack_enchs[inum]++;
-					if (!pack_enchs[inum]) {
-						pr_info("You feel an evil energy dissipate with the use of this scroll.");
-					}
-					if (scrench) {
-						pr_info("The scroll, being blessed, adds its magical energy to the item being enchanted.");
 						pack_enchs[inum]++;
 						if (!pack_enchs[inum]) {
 							pr_info("You feel an evil energy dissipate with the use of this scroll.");
 						}
+						if (scrench) {
+							pr_info("The scroll, being blessed, adds its magical energy to the item being enchanted.");
+							pack_enchs[inum]++;
+							if (!pack_enchs[inum]) {
+								pr_info("You feel an evil energy dissipate with the use of this scroll.");
+							}
+						}
 					}
-					}
-				} else if (item == I_SCROLL_BOIL) {
-					pr_info("You recite the words on this old scroll...");
-					pr_info("Is it just you, or does something feel warm around here?");
-					dungeon[player_y][player_x] = T_LAVA;
 				} else {
 					char buffer[255];
 					sprintf(buffer,"%s? You can't use that!",str_format(ITEM_NAMES[pack_items[inum]],1,pack_counts[inum])); // use pack_items[inum] to avoid disclosing information

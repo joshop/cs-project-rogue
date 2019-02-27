@@ -92,8 +92,10 @@ char *plantName(int id) {
 #define I_FOOD 669
 // conditions
 #define COND_NULL 0
-#define COND_POISON 1
-#define COND_NOMOVE 2
+#define COND_SPEED 1
+#define COND_SLOW 2
+#define COND_NOMOVE 3
+#define COND_NOSEE 4
 int ARMOR_SS[] = {0,10,11,12};
 int WEAPON_SS[] = {0,10,11,12};
 #define NUM_OF_IDEN_ITEMS 10
@@ -375,6 +377,9 @@ int weapon_on = 0;
 int weapon_en = 0;
 int armor_en = 0;
 int playerStr = 10;
+int maxhp = 100;
+
+int hp = 100; // hit points
 int conds[10];
 int numconds = 0;
 void applyCond(int cond) {
@@ -399,7 +404,7 @@ int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 		strengthDef += mod+ench;
 	}
 	strengthAtk += 6;
-	int missChance = (strengthAtk-strengthDef)/2;
+	int missChance = (strengthAtk-((!you && is_contained_in(conds, numconds, COND_NOSEE)) ? (strengthDef*2) : strengthDef))/2;
 	int val = rand()%missChance;
 	char theName[100];
 	sprintf(theName,"The %s",monstName);
@@ -426,7 +431,6 @@ int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 // str_format("hello of world",0,10) => "10 hellos of world"
 // str_format("foo bar of baz",0,10) => "10 foo bars of baz"
 char *str_format(char *str_pl, int article, int quantity) {
-	printf("hello how may i help you %s %d and %d\n",str_pl,article,quantity);
 	char str[256];
 	strcpy(str,str_pl); // incase we used a literal so we cant edit
 	char *buffer = (char *)malloc(256); // malloc so it doesn't go out of scope
@@ -435,38 +439,27 @@ char *str_format(char *str_pl, int article, int quantity) {
 		// the ternary expressions are really long and hard to understand
 		sprintf(buffer,"%s %s",(article?(article==2?"the":((str[0] == 'a' || str[0] == 'e' || str[0] == 'i' || str[0] == 'o' || str[0] == 'u')?"an":"a")):""),str);
 	} else {
-		printf("ah i see\n");
 		// pluralize
 		char *plural = (char *)malloc(256);
 		char *of_sep = strstr(str," of ");
 		strcpy(plural,"");
-	printf("doin good so far\n");
     if (!of_sep) { // no "of", null ptr
-    	printf("ok well this is pretty boring\n");
       strcat(plural,str);
       strcat(plural,"s");
     } else {
-    	printf("in that case here we are \n");
 		  *of_sep = '\0'; // cut off
-		  printf("EVERTHNNG IS OING ACCORDING TO PLAN %s\n",str);
 		  strcat(plural,str); // put everything before the of
-		  printf("STEP ONE %s\n",plural);
 		  strcat(plural,"s of "); // pluralize it
-		  printf("STEP ONE %s\n",plural);
 		  *of_sep = ' '; // don't overall change str
 		  of_sep += 4; // rest of str
 		  strcat(plural,of_sep); // append rest of string
-		  printf("STEP ONE %s\n",plural);
     }
 		if (quantity == 0) {
-			printf("ok almost here\n");
 			sprintf(buffer,"%sno %s",article==2?"the ":"",plural);
-			printf("what do we have here? its %s\n",buffer);
 		} else {
 			sprintf(buffer,"%s%d %s",article==2?"the ":"",quantity,plural);
 		}
 	}
-	printf("k so were done here bye\n");
 	return buffer;
 }
 //inventory
@@ -498,34 +491,23 @@ void del_item(int item, int quantity) { // delete items from the pack
 	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
 	// i think it works now (?)
 	char buffer[255];
-	printf("attempting to delete item %d (%d count)\n",item,quantity);
 	if (!is_contained_in(pack_items,20,item)) {
 		pr_info("You don't have that.");
-		printf("error code 666\n");
 	} else {
-		printf("error code FRED\n");
-		printf("lets see uh we have it here %d\n",is_contained_in(pack_items,20,item));
-		printf("and uh so yeah that means we have %d\n",pack_counts[is_contained_in(pack_items,20,item)-1]);
+
 		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
 			pr_info("You don't have enough of that to remove that many!");
-			printf("error code rous\n");
 		} else {
-			printf("on the other hand its called a um \"%s\"\n",ITEM_NAMES[item]);
-			printf("so from what i can tell this is not an error but %d\n",pack_counts[is_contained_in(pack_items,20,item)-1]-quantity);
 			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,20,item)-1]-quantity));
-			printf("non zero exit code\n");
 			pr_info(buffer);
 			if (pack_counts[is_contained_in(pack_items,20,item)-1] == quantity) {
-				printf("non zero exit code 2\n");
 				int idx_of = is_contained_in(pack_items,20,item);
 				for (int i = idx_of; i < num_pack_slots; i++) {
-					printf("error is here\n");
 					pack_items[i-1] = pack_items[i];
 					pack_counts[i-1] = pack_counts[i];
 				}
 				num_pack_slots--;
 			} else {
-				printf("non zero exit code 3\n");
 				pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
 			}
 		}
@@ -537,10 +519,6 @@ void take_inventory(int empty_lines) {
 		printf("Item %d: %s\n",i+1, str_format(ITEM_NAMES[pack_items[i]],1,pack_counts[i]));
 	}
 }
-int hp = 100; // hit points
-int maxhp = 100;
-
-// monster ais
 void basic_monst_ai(int x, int y) {
 	if (!tile_flag(x-1,y,SOLID)) {
 	monsters[y][x-1] = MONSTER_BASIC;
@@ -551,7 +529,10 @@ void basic_monst_ai(int x, int y) {
 		death_reason = "a random thing";
 	}
 }
+
+// monster ais
 void (*MONST_AIS[])(int x, int y) = {basic_monst_ai,basic_monst_ai};
+bool speed_toggle;
 int main() {
 	srand(time(NULL));
 	shuffle_rand_items();
@@ -565,8 +546,10 @@ int main() {
 	dungeon[6][6] = T_LAVA;
 	items[7][8] = I_POTION_GREEN;
 	items[8][8] = I_POTION_RED;
-	items[9][8] = I_POTION_HEAL;
+	items[9][8] = I_POTION_SPEED;
+	items[10][9] = I_POTION_INVIS;
 	enchs[9][8] = 2;
+	enchs[10][9] = 2;
 	monsters[8][9] = MONSTER_BASIC;
 	learn(I_POTION_RED);
 	bool game_running = true;
@@ -577,6 +560,20 @@ int main() {
 		enforce_borders();
 		printf("%s",ANSI_clr);
 		// display health bar
+		for (int c = 0; c < numconds; c++) {
+			int goaway = 0;
+			switch (conds[c]) {
+				case COND_SPEED:
+					goaway = 10;
+					break;
+				case COND_SLOW:
+					goaway = 10;
+					break;
+			}
+			if (rand()%100 <= goaway-1) {
+				remCond(conds[c]);
+			}
+		}
 		int num_dash = 10*((double)hp/(double)maxhp);
 		int barcol;
 		switch (num_dash) {
@@ -604,7 +601,25 @@ int main() {
 		color_set(barcol);
 		printf("%s%s",times("-",num_dash),times(" ",10-num_dash));
 		color_reset();
-		printf("|\n");
+		printf("| ");
+		for (int c = 0; c < numconds; c++) {
+			switch (conds[c]) {
+			 case COND_SPEED:
+				 color_set(GREEN);
+				 printf("SPEED ");
+				 break;
+			 case COND_SLOW:
+				 color_set(RED);
+				 printf("SLOW ");
+				 break;
+			 case COND_NOSEE:
+				 color_set(GREEN);
+				 printf("INVIS ");
+				 break;
+			}
+		}
+		color_reset();
+		printf("\n");
 		display_dungeon(0,0);
 		display_items(items);
 		display_monsts(monsters);
@@ -641,18 +656,42 @@ int main() {
 					item = iden_specifics[is_contained_in(iden_generics,NUM_OF_IDEN_ITEMS,item)-1]; // make it a specific just this once
 				}
 				if (item == I_POTION_HEAL) {
-					printf("see this my code works! yay\n");
 					if (pack_enchs[inum] == 0) { // uncursed
-						printf("see this my code works! yay\n");
 						pr_info("You feel... nothing.");
 					} else if (pack_enchs[inum] > 0) {
-						printf("see this my code works! yay\n");printf("see this my code works! yay\n");
 						pr_info("You feel healthier!");
 						hp = maxhp;
+						learn(pack_items[inum]);
 					} else {
-						printf("see this my code works! yay\n");printf("see this my code works! yay\n");printf("see this my code works! yay\n");
 						pr_info("Acid spills from the bottle!");
 						hp /= 2;
+						learn(pack_items[inum]);
+					}
+					del_item(pack_items[inum],1);
+				} else if (item == I_POTION_SPEED) {
+					if (pack_enchs[inum] == 0) { // uncursed
+						pr_info("You feel... nothing.");
+					} else if (pack_enchs[inum] > 0) {
+						pr_info("You feel faster!");
+						applyCond(COND_SPEED);
+						learn(pack_items[inum]);
+					} else {
+						pr_info("You feel faster! However, you are in reality slower.");
+						applyCond(COND_SLOW);
+						learn(pack_items[inum]);
+					}
+					del_item(pack_items[inum],1);
+				} else if (item == I_POTION_INVIS) {
+					if (pack_enchs[inum] == 0) { // uncursed
+						pr_info("You feel... nothing.");
+					} else if (pack_enchs[inum] > 0) {
+						pr_info("You feel invisible!");
+						applyCond(COND_NOSEE);
+						learn(pack_items[inum]);
+					} else {
+						pr_info("You feel... something. You just can't remember what..."); // amnesia
+						num_known--;
+						learn(pack_items[inum]);
 					}
 					del_item(pack_items[inum],1);
 				} else if (item >= I_ARMOR_1 && item <= I_WEAPON_1) {
@@ -773,11 +812,16 @@ int main() {
 			death = 2;
 		}
 		// update monster ais
-		for (int i = 0; i < D_HEIGHT; i++) {
-			for (int j = 0; j < D_WIDTH; j++) {
-				int x = monsters[i][j];
-				if (x) {
-					(*MONST_AIS[x])(j,i); // function pointers are weird
+		speed_toggle = !speed_toggle;
+		if (speed_toggle || !is_contained_in(conds, numconds, COND_SPEED)) {
+			for (int i = 0; (is_contained_in(conds, numconds, COND_SLOW) ? i-1 : i)<=0; i++) {
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						int x = monsters[i][j];
+						if (x) {
+							(*MONST_AIS[x])(j,i); // function pointers are weird
+						}
+					}
 				}
 			}
 		}

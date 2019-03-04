@@ -12,12 +12,17 @@
 #define CYAN 36
 #define WHITE 37
 #define DEFAULT_COL BLACK
+
+#define VISION_RANGE 5
+#define OMNISCIENCE 0
 // tile nums
 #define T_AIR 0
 #define T_WALL 1
 #define T_BORDER 2
 #define T_LAVA 3
-#define T_LASTPH 4
+#define T_UPS 4
+#define T_DOWNS 5
+#define T_LASTPH 6
 // other plants continue from here
 char *plantName(int id) {
 	// leaf twig stem root fruit
@@ -86,6 +91,8 @@ char *plantName(int id) {
 #define I_POTION_REGEN 19
 #define I_POTION_CURE 20
 #define I_SCROLL_ENCH 666
+
+#define MAXITEM 20
 // neither (armor and weapons)
 #define I_ARMOR_1 667
 #define I_WEAPON_1 668
@@ -102,10 +109,11 @@ int WEAPON_SS[] = {0,10,11,12};
 #define NUM_CATS 1
 // 447135
 #define MONSTER_BASIC 1
-int MONST_STRS[] = {0,10};
-int MONST_MAX[] = {0,20};
-#define D_WIDTH 20
-#define D_HEIGHT 20
+#define KOBOLD 2
+int MONST_STRS[] = {0,10,10};
+int MONST_MAX[] = {0,20,5};
+#define D_WIDTH 50
+#define D_HEIGHT 50
 
 int FIRST_GENERICS[] = {I_POTION_RED,I_POTION_HEAL};
 
@@ -128,6 +136,9 @@ void color_set(int color) { // enables a color
 void color_reset() { // back to default
 	printf("\x1b\x5b%dm",DEFAULT_COL);
 }
+void faint(int set) {
+	printf("\x1b\x5b%dm",set ? 2 : 0);
+}
 // some ANSI escape sequences
 char *ANSI_up = "\x1b\x5b""A";
 char *ANSI_down = "\x1b\x5b""B";
@@ -141,18 +152,18 @@ char *ANSI_scr_up = "\x1b\x5b""S";
 char *ANSI_scr_down = "\x1b\x5b""T";
 char *ANSI_home = "\x1b\x5b""H";
 // tileset
-char TILES[256] = " ##:!";
-int T_COLORS[256] = {WHITE,WHITE,BLUE,RED,YELLOW};
+char TILES[256] = ".##:<>!";
+int T_COLORS[256] = {WHITE,WHITE,BLUE,RED,BLACK,BLACK,YELLOW};
 #define SOLID 1
 #define PLANT 2
-int T_FLAGS[256] = {0,SOLID,SOLID,0,SOLID};
-char *T_NAMES[256] = {"air","wall","solid wall","lava","ERROR!*^%!@&#^%!@#qwertyuio"};
+int T_FLAGS[256] = {0,SOLID,SOLID,0,0,0,SOLID};
+char *T_NAMES[256] = {"air","wall","solid wall","lava","upstairs","downstairs","ERROR!*^%!@&#^%!@#qwertyuio"};
 void initPlants() {
 	for (int i = T_LASTPH; i<T_LASTPH+121; i++) {
-		/*TILES[i] = "\"";
+		TILES[i] = '"';
 		T_COLORS[i] = GREEN;
 		T_FLAGS[i] = PLANT;
-		T_NAMES[i] = plantName(i);*/
+		T_NAMES[i] = plantName(i);
 	}
 }
 // itemset and items on map
@@ -175,9 +186,9 @@ bool tile_flag(int tile_x, int tile_y, int test_flag) { // retrieve tile info
 // monsters
 int monsters[D_WIDTH][D_HEIGHT];
 int mdamages[D_WIDTH][D_HEIGHT];
-char *MONST_CHARS = " B";
-int MONST_COLS[] = {WHITE,RED};
-char *MONST_NAMES[] = {"","random thing"};
+char *MONST_CHARS = " Bk";
+int MONST_COLS[] = {WHITE,RED,RED};
+char *MONST_NAMES[] = {"","random thing","kobold"};
 
 // player
 int player_x;
@@ -206,15 +217,34 @@ int fill_tiles(int left_x, int top_y, int width, int height, int fill_with) { //
 		return 0;
 	}
 }
+// seen locations
+int seen[D_WIDTH][D_HEIGHT];
+void see(int x, int y) {
+	seen[y][x] = dungeon[y][x];
+}
+int visarray[D_WIDTH][D_HEIGHT];
+bool isSeen(int x, int y) {
+	return seen[y][x] != -1;
+}
 void display_dungeon(int left_x, int top_y) { 
 	// DISPLAYS THE DUNGEON (wow)
 	printf("%s%s%s%s", ANSI_home, ANSI_down, times(ANSI_right, left_x), times(ANSI_down, top_y));
 	// now we're at the starting position
 	for (int i = 0; i < D_HEIGHT; i++) {
 		for (int j = 0; j < D_WIDTH; j++) {
-			color_set(T_COLORS[dungeon[i][j]]);
-			printf("%c",TILES[dungeon[i][j]]);
-			color_reset();
+			if (visarray[i][j]) {
+				color_set(T_COLORS[dungeon[i][j]]);
+				printf("%c",TILES[dungeon[i][j]]);
+				color_reset();
+			} else if (isSeen(j,i)) {
+				color_set(T_COLORS[dungeon[i][j]]);
+				faint(1);
+				printf("%c",TILES[seen[i][j]]);
+				color_reset();
+				faint(0);
+			} else {
+				printf(" ");
+			}
 		}
 		printf("\n");
 	}
@@ -301,18 +331,14 @@ void shuffle_rand_items() { // generates identifiable items
 	for(int i = 0; i < NUM_OF_IDEN_ITEMS; i++) {
 		int cat_num = 0;
 		while (i+FIRST_GENERICS[0] >= FIRST_GENERICS[cat_num]) {
-			printf("yeah we have %d in %d\n",FIRST_GENERICS[cat_num],cat_num);
 			cat_num++; // find which category generic is in
 		}
 		cat_num--;
-		printf("i=%d CATEGORY: %d\n",i,cat_num);
 		int min_val = FIRST_GENERICS[cat_num]; // first item of category
 		int max_val = cat_num+1 == NUM_CATS ? NUM_OF_IDEN_ITEMS : FIRST_GENERICS[cat_num+1]-1; // last item of category
-		printf("from %d-%d\n",min_val,max_val);
 		int rand_val;
 		do {
 			rand_val = rand()%(max_val-min_val+1)+min_val;
-			printf("poop %d\n",rand_val);
 		} while (is_contained_in(iden_specifics, NUM_OF_IDEN_ITEMS, rand_val+NUM_OF_IDEN_ITEMS)); // while value is already used
 		iden_generics[i] = i+FIRST_GENERICS[0]; // whichever item operating on
 		iden_specifics[i] = rand_val+NUM_OF_IDEN_ITEMS; // corresponding specific
@@ -343,7 +369,11 @@ void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 				printf("%s%s", ANSI_home, ANSI_down); // skip HP bar
 				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
 				color_set(ITEM_COLS[itemlist[y][x]]);
-				printf("%c",ic);
+				if (visarray[y][x]) {
+					printf("%c",ic);
+				} else {
+					printf(" ");
+				}
 				color_reset();
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
@@ -365,7 +395,11 @@ void display_monsts(int monstlist[D_HEIGHT][D_WIDTH]) { // copy of items pretty 
 				printf("%s%s", ANSI_home, ANSI_down); // skip HP bar
 				printf("%s%s", times(ANSI_right, x), times(ANSI_down, y));
 				color_set(MONST_COLS[monstlist[y][x]]);
-				printf("%c",mc);
+				if (visarray[y][x]) {
+					printf("%c",mc);
+				} else {
+					printf(" ");
+				}
 				color_reset();
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
@@ -467,26 +501,6 @@ int pack_items[20];
 int pack_counts[20];
 int pack_enchs[20];
 int num_pack_slots = 0;
-void add_item(int item, int quantity, int ench) { // add an item to your pack
-	char buffer[255];
-	if (is_contained_in(pack_items,20,item)) { // already exists
-    int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
-		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
-		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,prev_amt+quantity));
-		pr_info(buffer);
-	} else { // new item
-		if (num_pack_slots == 20) {
-			pr_info("You don't have enough space in your pack.");
-		} else {
-			pack_items[num_pack_slots] = item;
-			pack_counts[num_pack_slots] = quantity;
-			pack_enchs[num_pack_slots] = ench;
-			num_pack_slots++;
-			sprintf(buffer,"Item #%d: %s.",num_pack_slots,str_format(ITEM_NAMES[item],1,quantity));
-			pr_info(buffer);
-		}
-	}
-}
 void del_item(int item, int quantity) { // delete items from the pack
 	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
 	// i think it works now (?)
@@ -513,12 +527,33 @@ void del_item(int item, int quantity) { // delete items from the pack
 		}
 	}
 }
+void add_item(int item, int quantity, int ench) { // add an item to your pack
+	char buffer[255];
+	if (is_contained_in(pack_items,20,item)) { // already exists
+    int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
+		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
+		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,prev_amt+quantity));
+		pr_info(buffer);
+	} else { // new item
+		if (num_pack_slots == 20) {
+			pr_info("You don't have enough space in your pack.");
+		} else {
+			pack_items[num_pack_slots] = item;
+			pack_counts[num_pack_slots] = quantity;
+			pack_enchs[num_pack_slots] = ench;
+			num_pack_slots++;
+			sprintf(buffer,"Item #%d: %s.",num_pack_slots,str_format(ITEM_NAMES[item],1,quantity));
+			pr_info(buffer);
+		}
+	}
+}
 void take_inventory(int empty_lines) {
 	printf("%s%sInventory: %d items\n",times(ANSI_down, empty_lines), ANSI_home,num_pack_slots);
 	for (int i = 0; i < num_pack_slots; i++) {
 		printf("Item %d: %s\n",i+1, str_format(ITEM_NAMES[pack_items[i]],1,pack_counts[i]));
 	}
 }
+int ai_data[D_HEIGHT][D_WIDTH]; // can edit stuff
 void basic_monst_ai(int x, int y) {
 	if (!tile_flag(x-1,y,SOLID)) {
 	monsters[y][x-1] = MONSTER_BASIC;
@@ -529,9 +564,144 @@ void basic_monst_ai(int x, int y) {
 		death_reason = "a random thing";
 	}
 }
-
+void kobold_ai(int x, int y) {
+	if (near(x,y,player_x,player_y)) {
+		hp -= attack(10, playerStr, "kobold", 0);
+		death_reason = "a kobold";
+		return;
+	}
+	if (!ai_data[y][x]) { // has not seen you
+		if (rand()%2) {
+			switch (rand()%4) {
+			case 0:
+				if (!tile_flag(x-1,y,SOLID)) {
+					monsters[y][x-1] = KOBOLD;
+					monsters[y][x] = 0;
+					mdamages[y][x-1] = mdamages[y][x];
+				}
+				break;
+			case 1:
+				if (!tile_flag(x+1,y,SOLID)) {
+					monsters[y][x+1] = KOBOLD;
+					monsters[y][x] = 0;
+					mdamages[y][x+1] = mdamages[y][x];
+				}
+				break;
+			case 2:
+				if (!tile_flag(x,y+1,SOLID)) {
+					monsters[y+1][x] = KOBOLD;
+					monsters[y][x] = 0;
+					mdamages[y+1][x] = mdamages[y][x];
+				}
+				break;
+			case 3:
+				if (!tile_flag(x,y-1,SOLID)) {
+					monsters[y-1][x] = KOBOLD;
+					monsters[y][x] = 0;
+					mdamages[y-1][x] = mdamages[y][x];
+				}
+				break;
+			}
+		}
+		if (visarray[y][x] && !(rand()%4)) {
+			pr_info("The kobold sees you!");
+			ai_data[y][x] = 1;
+		}
+	} else {
+		bool justupd[D_HEIGHT][D_WIDTH];
+		for (int moves = 0; moves < 1; moves++) {
+			for (int i = 0; i < D_HEIGHT; i++) {
+				for (int j = 0; j < D_WIDTH; j++) {
+					visarray[i][j] = 0;
+					justupd[i][j] = false;
+				}
+			}
+			visarray[player_y][player_x] = 1;
+			for (int iter = 0; iter < VISION_RANGE*2-2; iter++) {
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						justupd[i][j] = false;
+					}
+				}
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						if (visarray[i][j] ) continue;
+						if (visarray[i-1][j] && !justupd[i-1][j] && !tile_flag(j,i-1,SOLID)) {
+							visarray[i][j] = visarray[i-1][j]+1;
+							justupd[i][j] = true;
+						} else if (visarray[i+1][j] && !justupd[i+1][j] && !tile_flag(j,i+1,SOLID)) {
+							visarray[i][j] = visarray[i+1][j]+1;
+							justupd[i][j] = true;
+						} else if (visarray[i][j-1] && !justupd[i][j-1] && !tile_flag(j-1,i,SOLID)) {
+							visarray[i][j] = visarray[i][j-1]+1;
+							justupd[i][j] = true;
+						} else if (visarray[i][j+1] && !justupd[i][j+1] && !tile_flag(j+1,i,SOLID)) {
+							visarray[i][j] = visarray[i][j+1]+1;
+							justupd[i][j] = true;
+						}
+					}
+				}
+				/*
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						printf("%d ",visarray[i][j]);
+					}
+					printf("\n");
+				}
+				getch_(0);
+				*/
+			}
+			/*
+			for (int i = 0; i < D_HEIGHT; i++) {
+				for (int j = 0; j < D_WIDTH; j++) {
+					if (i == y && j == x) printf("K ");
+					else printf("%d ",visarray[i][j]);
+				}
+				printf("\n");
+			}
+			getch_(0);
+			*/
+			int poss_dx[4];
+			int poss_dy[4];
+			int num_poss = 0;
+			if (visarray[y][x] > visarray[y-1][x]) {
+				poss_dx[num_poss] = 0;
+				poss_dy[num_poss] = -1;
+				num_poss++;
+			}
+			if (visarray[y][x] > visarray[y+1][x]) {
+				poss_dx[num_poss] = 0;
+				poss_dy[num_poss] = 1;
+				num_poss++;
+			}
+			if (visarray[y][x] > visarray[y][x-1]) {
+				poss_dx[num_poss] = -1;
+				poss_dy[num_poss] = 0;
+				num_poss++;
+			}
+			if (visarray[y][x] > visarray[y][x+1]) {
+				poss_dx[num_poss] = 1;
+				poss_dy[num_poss] = 0;
+				num_poss++;
+			}
+			if (num_poss) {
+				int choice = rand()%num_poss;
+				int dx = poss_dx[choice];
+				int dy = poss_dy[choice];
+				if (visarray[y+dy][x+dx] == 1) {
+					hp -= attack(10, playerStr, "kobold", 0);
+					death_reason = "a kobold";
+			    } else if (!tile_flag(x+dx,y+dy,SOLID)) {
+					monsters[y+dy][x+dx] = KOBOLD;
+					monsters[y][x] = 0;
+					mdamages[y+dy][x+dx] = mdamages[y][x];
+				}
+			}
+		}
+	}
+}
 // monster ais
-void (*MONST_AIS[])(int x, int y) = {basic_monst_ai,basic_monst_ai};
+void (*MONST_AIS[])(int x, int y) = {basic_monst_ai,basic_monst_ai,kobold_ai};
 bool speed_toggle;
 int main() {
 	srand(time(NULL));
@@ -541,8 +711,64 @@ int main() {
 	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
+	for (int i = 0; i < D_HEIGHT; i++) {
+		for (int j = 0; j < D_WIDTH; j++) {
+			seen[i][j] = -1;
+		}
+	}
 	initPlants();
+	system("python dungeon.py"); // yes, i know, this is a dumb way to do it
+	FILE *dungFile = fopen("dungeon.out","r");
+	for (int i = 0; i < D_HEIGHT; i++) {
+		for (int j = 0; j < D_WIDTH; j++) {
+			fscanf(dungFile,"%d",&(dungeon[i][j]));
+			fgetc(dungFile);
+			if (dungeon[i][j] == T_UPS) {
+				player_x = j;
+				player_y = i;
+			}
+		}
+	}
+	// no monsters will spawn here
+	visarray[player_y][player_x] = 1;
+	for (int iter = 0; iter < VISION_RANGE; iter++) {
+		for (int i = 0; i < D_HEIGHT; i++) {
+			for (int j = 0; j < D_WIDTH; j++) {
+				if (visarray[i][j] != 1 && ((visarray[i+1][j] == 1 && !tile_flag(j,i+1,SOLID)) || (visarray[i-1][j] == 1 && !tile_flag(j,i-1,SOLID)) || (visarray[i][j+1] == 1 && !tile_flag(j+1,i,SOLID))|| (visarray[i][j-1] == 1 && !tile_flag(j-1,i,SOLID)))) {
+					visarray[i][j] = 2;
+				}
+			}
+		}
+		for (int i = 0; i < D_HEIGHT; i++) {
+			for (int j = 0; j < D_WIDTH; j++) {
+				if (visarray[i][j] == 2) {
+					visarray[i][j] = 1;
+				}
+			}
+		}
+	}
+	// gen monsters
+	for (int i = 0; i < D_HEIGHT; i++) {
+		for (int j = 0; j < D_WIDTH; j++) {
+			if (!dungeon[i][j] && !visarray[i][j] && !(rand()%40)) {
+				monsters[i][j] = KOBOLD;
+				mdamages[i][j] = 0;
+			}
+		}
+	}
+	// gen items
+	for (int i = 0; i < D_HEIGHT; i++) {
+			for (int j = 0; j < D_WIDTH; j++) {
+				if (!dungeon[i][j] && !(rand()%30)) {
+					items[i][j] = (rand()%MAXITEM)+1;
+					enchs[i][j] = (rand()%3)-1;
+				}
+			}
+		}
 	// placeholder for dungeon gen
+	/*
+	player_x = 1;
+	player_y = 1;
 	dungeon[6][6] = T_LAVA;
 	items[7][8] = I_POTION_GREEN;
 	items[8][8] = I_POTION_RED;
@@ -552,9 +778,8 @@ int main() {
 	enchs[10][9] = 2;
 	monsters[8][9] = MONSTER_BASIC;
 	learn(I_POTION_RED);
+	*/
 	bool game_running = true;
-	player_x = 1;
-	player_y = 1;
 	pr_info("Welcome to INROGUE!");
 	while (game_running) {
 		enforce_borders();
@@ -620,6 +845,36 @@ int main() {
 		}
 		color_reset();
 		printf("\n");
+		// calculate vision
+		for (int i = 0; i < D_HEIGHT; i++) {
+			for (int j = 0; j < D_WIDTH; j++) {
+				visarray[i][j] = 0;
+			}
+		}
+		visarray[player_y][player_x] = 1;
+		for (int iter = 0; iter < VISION_RANGE; iter++) {
+			for (int i = 0; i < D_HEIGHT; i++) {
+				for (int j = 0; j < D_WIDTH; j++) {
+					if (visarray[i][j] != 1 && ((visarray[i+1][j] == 1 && !tile_flag(j,i+1,SOLID)) || (visarray[i-1][j] == 1 && !tile_flag(j,i-1,SOLID)) || (visarray[i][j+1] == 1 && !tile_flag(j+1,i,SOLID))|| (visarray[i][j-1] == 1 && !tile_flag(j-1,i,SOLID)))) {
+						visarray[i][j] = 2;
+					}
+				}
+			}
+			for (int i = 0; i < D_HEIGHT; i++) {
+				for (int j = 0; j < D_WIDTH; j++) {
+					if (visarray[i][j] == 2) {
+						visarray[i][j] = 1;
+					}
+				}
+			}
+		}
+		for (int i = 0; i < D_HEIGHT; i++) {
+			for (int j = 0; j < D_WIDTH; j++) {
+				if (visarray[i][j] || OMNISCIENCE) {
+					see(j,i);
+				}
+			}
+		}
 		display_dungeon(0,0);
 		display_items(items);
 		display_monsts(monsters);

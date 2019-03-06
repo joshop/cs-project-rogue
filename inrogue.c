@@ -90,12 +90,12 @@ char *plantName(int id) {
 #define I_POTION_GHOST 18
 #define I_POTION_REGEN 19
 #define I_POTION_CURE 20
-#define I_SCROLL_ENCH 666
+#define I_SCROLL_ENCH 21
 
-#define MAXITEM 20
+#define MAXITEM 23
 // neither (armor and weapons)
-#define I_ARMOR_1 667
-#define I_WEAPON_1 668
+#define I_ARMOR_1 23
+#define I_WEAPON_1 22
 #define I_FOOD 669
 // conditions
 #define COND_NULL 0
@@ -103,6 +103,8 @@ char *plantName(int id) {
 #define COND_SLOW 2
 #define COND_NOMOVE 3
 #define COND_NOSEE 4
+#define COND_WEAK 5
+#define COND_BLIND 6
 int ARMOR_SS[] = {0,10,11,12};
 int WEAPON_SS[] = {0,10,11,12};
 #define NUM_OF_IDEN_ITEMS 10
@@ -110,8 +112,8 @@ int WEAPON_SS[] = {0,10,11,12};
 // 447135
 #define MONSTER_BASIC 1
 #define KOBOLD 2
-int MONST_STRS[] = {0,10,10};
-int MONST_MAX[] = {0,20,5};
+int MONST_STRS[] = {0,10,9};
+int MONST_MAX[] = {0,20,20};
 #define D_WIDTH 50
 #define D_HEIGHT 50
 
@@ -169,9 +171,9 @@ void initPlants() {
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
 int enchs[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !!!!!!!!!!!!!!!!!!!!";
-int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE};
-char *ITEM_NAMES[] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing"};
+char *ITEM_CHARS = " !!!!!!!!!!!!!!!!!!!!?/@";
+int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,GREEN,WHITE,WHITE};
+char *ITEM_NAMES[] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing","scroll of enchantment","dagger","leather armor"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 
@@ -357,6 +359,63 @@ int num_known = 0;
 void learn(int thing) {
 	known_things[num_known++] = thing;
 }
+char *str_format(char *str_pl, int article, int quantity); // forward declaration
+//inventory
+int pack_items[20];
+int pack_counts[20];
+int pack_enchs[20];
+int num_pack_slots = 0;
+void del_item(int item, int quantity) { // delete items from the pack
+	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
+	// i think it works now (?)
+	char buffer[255];
+	if (!is_contained_in(pack_items,20,item)) {
+		pr_info("You don't have that.");
+	} else {
+		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
+			pr_info("You don't have enough of that to remove that many!");
+		} else {
+			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,20,item)-1]-quantity));
+			pr_info(buffer);
+			if (pack_counts[is_contained_in(pack_items,20,item)-1] == quantity) {
+				int idx_of = is_contained_in(pack_items,20,item);
+				for (int i = idx_of; i < num_pack_slots; i++) {
+					pack_items[i-1] = pack_items[i];
+					pack_counts[i-1] = pack_counts[i];
+				}
+				num_pack_slots--;
+			} else {
+				pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
+			}
+		}
+	}
+}
+void add_item(int item, int quantity, int ench) { // add an item to your pack
+	char buffer[255];
+	if (is_contained_in(pack_items,20,item)) { // already exists
+    int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
+		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
+		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,prev_amt+quantity));
+		pr_info(buffer);
+	} else { // new item
+		if (num_pack_slots == 20) {
+			pr_info("You don't have enough space in your pack.");
+		} else {
+			pack_items[num_pack_slots] = item;
+			pack_counts[num_pack_slots] = quantity;
+			pack_enchs[num_pack_slots] = ench;
+			num_pack_slots++;
+			sprintf(buffer,"Item #%d: %s.",num_pack_slots,str_format(ITEM_NAMES[item],1,quantity));
+			pr_info(buffer);
+		}
+	}
+}
+void take_inventory(int empty_lines) {
+	printf("%s%sInventory: %d items\n",times(ANSI_down, empty_lines), ANSI_home,num_pack_slots);
+	for (int i = 0; i < num_pack_slots; i++) {
+		printf("Item %d: %s\n",i+1, str_format(ITEM_NAMES[pack_items[i]],1,pack_counts[i]));
+	}
+}
 void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 	for (int y = 0; y < D_HEIGHT; y++) {
 		for (int x = 0; x < D_WIDTH; x++) {
@@ -377,6 +436,12 @@ void display_items(int itemlist[D_HEIGHT][D_WIDTH]) {
 				color_reset();
 				printf("%s",times(ANSI_next,D_HEIGHT-player_y));
 			}
+		}
+	}
+	// also scan for pack iden items
+	for (int i = 0; i < num_pack_slots; i++) {
+		if (is_contained_in(known_things, num_known, pack_items[i]) && pack_items[i] <= NUM_OF_IDEN_ITEMS) {
+			pack_items[i] = iden_specifics[is_contained_in(iden_generics, NUM_OF_IDEN_ITEMS, pack_items[i])-1];
 		}
 	}
 }
@@ -416,26 +481,40 @@ int maxhp = 100;
 int hp = 100; // hit points
 int conds[10];
 int numconds = 0;
-void applyCond(int cond) {
+int condDur[10];
+void applyCond(int cond, int dur) {
 	conds[numconds] = cond;
+	condDur[numconds] = dur;
 	numconds++;
 }
 void remCond(int cond) {
 	int loc = is_contained_in(conds, numconds, cond)-1;
 	conds[loc] = COND_NULL;
-	while (conds[numconds] == COND_NULL) numconds--;
+	while (conds[numconds] == COND_NULL && numconds)
+	{
+		numconds--;
+	}
 }
 int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 	if (you) {
 		int sval = WEAPON_SS[weapon_on]-playerStr-weapon_en;
-		int mod = weapon_on - sval>0?sval:0;
+		int mod = weapon_on - ((sval>0)?sval:0);
 		int ench = weapon_en*2;
+		printf("wgufwgfuygrewfjgj LOOOK HERE MODIFIER %d also aARGS Were (%d,%d,%s,%d)\n",mod+ench,strengthAtk,strengthDef,monstName,you);
 		strengthAtk += mod+ench;
 	} else {
 		int sval = ARMOR_SS[armor_on]-playerStr-armor_en;
 		int mod = armor_on - ((sval>0)?sval:0);
 		int ench = armor_en*2;
+		printf("wgufwgfuygrewfjgj LOOOK HERE MODIFIER %d also aARGS Were (%d,%d,%s,%d)\n",mod+ench,strengthAtk,strengthDef,monstName,you);
 		strengthDef += mod+ench;
+	}
+	if (you && is_contained_in(conds, numconds, COND_WEAK)) {
+		strengthAtk /= 3;
+		strengthAtk *= 2;
+	} else if (!you && is_contained_in(conds, numconds, COND_WEAK)) {
+		strengthDef /= 3;
+		strengthDef *= 2;
 	}
 	strengthAtk += 6;
 	int missChance = (strengthAtk-((!you && is_contained_in(conds, numconds, COND_NOSEE)) ? (strengthDef*2) : strengthDef))/2;
@@ -443,7 +522,7 @@ int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 	char theName[100];
 	sprintf(theName,"The %s",monstName);
 	if (val) { // hit
-		sprintf(theName,"%s hit%s!",you?"You":theName,you?"":"s");
+		sprintf(theName,"%s hit%s for %d damage!",you?"You":theName,you?"":"s",val*strengthAtk/(strengthDef/4));
 		pr_info(theName);
 		return val*strengthAtk/(strengthDef/4);
 	} else { // miss
@@ -496,63 +575,7 @@ char *str_format(char *str_pl, int article, int quantity) {
 	}
 	return buffer;
 }
-//inventory
-int pack_items[20];
-int pack_counts[20];
-int pack_enchs[20];
-int num_pack_slots = 0;
-void del_item(int item, int quantity) { // delete items from the pack
-	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
-	// i think it works now (?)
-	char buffer[255];
-	if (!is_contained_in(pack_items,20,item)) {
-		pr_info("You don't have that.");
-	} else {
 
-		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
-			pr_info("You don't have enough of that to remove that many!");
-		} else {
-			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,20,item)-1]-quantity));
-			pr_info(buffer);
-			if (pack_counts[is_contained_in(pack_items,20,item)-1] == quantity) {
-				int idx_of = is_contained_in(pack_items,20,item);
-				for (int i = idx_of; i < num_pack_slots; i++) {
-					pack_items[i-1] = pack_items[i];
-					pack_counts[i-1] = pack_counts[i];
-				}
-				num_pack_slots--;
-			} else {
-				pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
-			}
-		}
-	}
-}
-void add_item(int item, int quantity, int ench) { // add an item to your pack
-	char buffer[255];
-	if (is_contained_in(pack_items,20,item)) { // already exists
-    int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
-		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
-		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,prev_amt+quantity));
-		pr_info(buffer);
-	} else { // new item
-		if (num_pack_slots == 20) {
-			pr_info("You don't have enough space in your pack.");
-		} else {
-			pack_items[num_pack_slots] = item;
-			pack_counts[num_pack_slots] = quantity;
-			pack_enchs[num_pack_slots] = ench;
-			num_pack_slots++;
-			sprintf(buffer,"Item #%d: %s.",num_pack_slots,str_format(ITEM_NAMES[item],1,quantity));
-			pr_info(buffer);
-		}
-	}
-}
-void take_inventory(int empty_lines) {
-	printf("%s%sInventory: %d items\n",times(ANSI_down, empty_lines), ANSI_home,num_pack_slots);
-	for (int i = 0; i < num_pack_slots; i++) {
-		printf("Item %d: %s\n",i+1, str_format(ITEM_NAMES[pack_items[i]],1,pack_counts[i]));
-	}
-}
 int ai_data[D_HEIGHT][D_WIDTH]; // can edit stuff
 void basic_monst_ai(int x, int y) {
 	if (!tile_flag(x-1,y,SOLID)) {
@@ -689,7 +712,7 @@ void kobold_ai(int x, int y) {
 				int dx = poss_dx[choice];
 				int dy = poss_dy[choice];
 				if (visarray[y+dy][x+dx] == 1) {
-					hp -= attack(10, playerStr, "kobold", 0);
+					hp -= attack(9, playerStr, "kobold", 0);
 					death_reason = "a kobold";
 			    } else if (!tile_flag(x+dx,y+dy,SOLID)) {
 					monsters[y+dy][x+dx] = KOBOLD;
@@ -750,9 +773,9 @@ int main() {
 	// gen monsters
 	for (int i = 0; i < D_HEIGHT; i++) {
 		for (int j = 0; j < D_WIDTH; j++) {
+			mdamages[i][j] = 0;
 			if (!dungeon[i][j] && !visarray[i][j] && !(rand()%40)) {
 				monsters[i][j] = KOBOLD;
-				mdamages[i][j] = 0;
 			}
 		}
 	}
@@ -762,6 +785,9 @@ int main() {
 				if (!dungeon[i][j] && !(rand()%30)) {
 					items[i][j] = (rand()%MAXITEM)+1;
 					enchs[i][j] = (rand()%3)-1;
+				} else if (!dungeon[i][j] && !(rand()%60)) {
+					items[i][j] = I_POTION_HEAL;
+					enchs[i][j] = 1;
 				}
 			}
 		}
@@ -786,16 +812,7 @@ int main() {
 		printf("%s",ANSI_clr);
 		// display health bar
 		for (int c = 0; c < numconds; c++) {
-			int goaway = 0;
-			switch (conds[c]) {
-				case COND_SPEED:
-					goaway = 10;
-					break;
-				case COND_SLOW:
-					goaway = 10;
-					break;
-			}
-			if (rand()%100 <= goaway-1) {
+			if (!(condDur[c]--)) {
 				remCond(conds[c]);
 			}
 		}
@@ -841,6 +858,14 @@ int main() {
 				 color_set(GREEN);
 				 printf("INVIS ");
 				 break;
+			 case COND_WEAK:
+				 color_set(RED);
+				 printf("WEAK ");
+				 break;
+			 case COND_BLIND:
+				 color_set(RED);
+				 printf("BLIND ");
+				 break;
 			}
 		}
 		color_reset();
@@ -852,7 +877,7 @@ int main() {
 			}
 		}
 		visarray[player_y][player_x] = 1;
-		for (int iter = 0; iter < VISION_RANGE; iter++) {
+		for (int iter = 0; iter < VISION_RANGE && !is_contained_in(conds, numconds, COND_BLIND); iter++) {
 			for (int i = 0; i < D_HEIGHT; i++) {
 				for (int j = 0; j < D_WIDTH; j++) {
 					if (visarray[i][j] != 1 && ((visarray[i+1][j] == 1 && !tile_flag(j,i+1,SOLID)) || (visarray[i-1][j] == 1 && !tile_flag(j,i-1,SOLID)) || (visarray[i][j+1] == 1 && !tile_flag(j+1,i,SOLID))|| (visarray[i][j-1] == 1 && !tile_flag(j-1,i,SOLID)))) {
@@ -928,11 +953,11 @@ int main() {
 						pr_info("You feel... nothing.");
 					} else if (pack_enchs[inum] > 0) {
 						pr_info("You feel faster!");
-						applyCond(COND_SPEED);
+						applyCond(COND_SPEED,10);
 						learn(pack_items[inum]);
 					} else {
-						pr_info("You feel faster! However, you are in reality slower.");
-						applyCond(COND_SLOW);
+						pr_info("You feel slower...");
+						applyCond(COND_SLOW,10);
 						learn(pack_items[inum]);
 					}
 					del_item(pack_items[inum],1);
@@ -941,11 +966,38 @@ int main() {
 						pr_info("You feel... nothing.");
 					} else if (pack_enchs[inum] > 0) {
 						pr_info("You feel invisible!");
-						applyCond(COND_NOSEE);
+						applyCond(COND_NOSEE,20);
 						learn(pack_items[inum]);
 					} else {
 						pr_info("You feel... something. You just can't remember what..."); // amnesia
 						num_known--;
+						learn(pack_items[inum]);
+					}
+					del_item(pack_items[inum],1);
+				} else if (item == I_POTION_STRENGTH) {
+					if (pack_enchs[inum] == 0) { // uncursed
+						pr_info("You feel... nothing.");
+					} else if (pack_enchs[inum] > 0) {
+						pr_info("You feel stronger!");
+						playerStr++;
+						learn(pack_items[inum]);
+					} else {
+						pr_info("You feel weaker...");
+						applyCond(COND_WEAK,20);
+						learn(pack_items[inum]);
+					}
+					del_item(pack_items[inum],1);
+				} else if (item == I_POTION_MAXHP) {
+					if (pack_enchs[inum] == 0) { // uncursed
+						pr_info("You feel... nothing.");
+					} else if (pack_enchs[inum] > 0) {
+						pr_info("Your maximum HP increases!");
+						hp += maxhp/3;
+						maxhp += maxhp/3;
+						learn(pack_items[inum]);
+					} else {
+						pr_info("You can't see!");
+						applyCond(COND_BLIND,20);
 						learn(pack_items[inum]);
 					}
 					del_item(pack_items[inum],1);
@@ -1006,24 +1058,36 @@ int main() {
 				keypress = getch_(0); // meat of the escape sequence
 				switch (keypress) {
 					case 'A': // up arrow
-					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
-					else if (monsters[player_y-1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y-1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
-					else if (!tile_flag(player_x, player_y - 1, SOLID)) player_y--;
+					if (is_contained_in(conds,numconds,COND_NOMOVE))
+						pr_info("You can't move!");
+					else if (monsters[player_y-1][player_x])
+						mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y-1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x, player_y - 1, SOLID))
+						player_y--;
 					break;
 					case 'B': // down arrow
-					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
-					else if (monsters[player_y+1][player_x]) mdamages[player_y-1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y+1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
-					else if (!tile_flag(player_x, player_y + 1, SOLID)) player_y++;
+					if (is_contained_in(conds,numconds,COND_NOMOVE))
+						pr_info("You can't move!");
+					else if (monsters[player_y+1][player_x])
+						mdamages[player_y+1][player_x] += attack(playerStr, MONST_STRS[monsters[player_y+1][player_x]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x, player_y + 1, SOLID))
+						player_y++;
 					break;
 					case 'C': // right arrow
-					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
-					else if (monsters[player_y][player_x+1]) mdamages[player_y][player_x+1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x+1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
-					else if (!tile_flag(player_x + 1, player_y, SOLID)) player_x++;
+					if (is_contained_in(conds,numconds,COND_NOMOVE))
+						pr_info("You can't move!");
+					else if (monsters[player_y][player_x+1])
+						mdamages[player_y][player_x+1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x+1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x + 1, player_y, SOLID))
+						player_x++;
 					break;
 					case 'D': // left arrow
-					if (is_contained_in(conds,numconds,COND_NOMOVE)) pr_info("You can't move!");
-					else if (monsters[player_y][player_x-1]) mdamages[player_y][player_x-1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x-1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
-					else if (!tile_flag(player_x - 1, player_y, SOLID)) player_x--;
+					if (is_contained_in(conds,numconds,COND_NOMOVE))
+						pr_info("You can't move!");
+					else if (monsters[player_y][player_x-1])
+						mdamages[player_y][player_x-1] += attack(playerStr, MONST_STRS[monsters[player_y][player_x-1]], "YOU SHOULD NEVER SEE THIS. IF YOU DO THERE IS A GLITCH IN THE GAME",1);
+					else if (!tile_flag(player_x - 1, player_y, SOLID))
+						player_x--;
 					break;
 				}
 			} else if (keypress == '\x1b') { // ...or the user pressed ESC
@@ -1036,6 +1100,38 @@ int main() {
 					printc("\nReally? NO? Wimp!\n",RED);
 				}
 				getch_(0);
+			}
+		} else if (keypress == '?') {
+			printf("%s%sWelcome to YACROGUE! In this game, you must adventure through the dungeon! Note that this is a VERY early version of the game.\nCommands:\narrows - move, or attack a monster by moving into it\ni - view your items\nw - view armor and weapons\nu - use an item\np - pick up an item on the floor\n? - view help\nshift-d - activate DEBUG MODE (if you are testing this game, this mode is highly suggested!)\nPress any key to go to next page...\n",ANSI_clr,ANSI_home);
+			getch_(0);
+			printf("%s%sPotions are magical elixirs that one can drink to have varying effects. Some do nothing, some have positive effects and some have negative effects. In this early version, some potions cannot be used. \nYou will not immediately know what a potion does upon finding it always. Some potions will simply be identified by a color. Negative potions are always found disguised as positive potions. \nNOTE: It is RANDOM what colors correspond to what potions. DO NOT ASK ME \"what the red potion does\". I DO NOT KNOW.\nThe following potions exist:\nHealing - heals you.\nAcid - hurts you.\nSpeed - speeds your movement and attack.\nSlow - slows your movement and attack.\nStrength - permanently increases your strength.\nWeakness - decreases your strength for some time.\nInvisibility - makes you invisible.\nBlindness - causes you to go blind temporarily.\nEndurance - increases your maximum health.\nPress any key to go to the next page...\n",ANSI_clr,ANSI_home);
+			getch_(0);
+			printf("%s%sYou will encounter monsters in the dungeon. Only one currently exists: the kobold. It will attempt to move towards you and attack when it is near. Defeat them by any means!\nLava also exists in the dungeon. If you touch it, you die.\nPress any key to exit help...",ANSI_clr,ANSI_home);
+			getch_(0);
+		} else if (keypress == 'D') {
+			printf("%s\n1. Give item\n2. Identify item\n3. Give condition\n4. Exit",ANSI_home);
+			printf("%sSelect choice: ",ANSI_home);
+			int dchoice;
+			scanf("%d",&dchoice);
+			if (dchoice == 1) {
+				printf("%s%s\n",ANSI_home,ANSI_clr);
+				for (int i = 1; i <= MAXITEM; i++) {
+					printf("%d. %s\n",i,ITEM_NAMES[i]);
+				}
+				int qchoice, echoice;
+				printf("%sSelect choice: ",ANSI_home);
+				scanf("%d",&dchoice);
+				printf("%sSelect quantity: ",ANSI_home);
+				scanf("%d",&qchoice);
+				printf("%sSelect enchantment (negative = bad, positive = good, zero = not magical): ",ANSI_home);
+				scanf("%d",&echoice);
+				add_item(dchoice,qchoice,echoice);
+			} else if (dchoice == 2) {
+				printf("%s",ANSI_clr);
+				take_inventory(1);
+				printf("%sWhich item number? ",ANSI_home);
+				scanf("%d",&dchoice);
+				learn(pack_items[dchoice-1]);
 			}
 		}
 		// check what you're standing on

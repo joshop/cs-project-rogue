@@ -30,7 +30,7 @@ char *plantName(int id) {
 	if (id == 5) s = "grass";
 	else {
 		char *a;
-		int z = (id-5)/5;
+		int z = (id-6)/5;
 		if (z == 0) a = "alpha";
 		if (z == 1) a = "beta";
 		if (z == 2) a = "gamma";
@@ -55,7 +55,7 @@ char *plantName(int id) {
 		if (z == 21) a = "hi";
 		if (z == 22) a = "psi";
 		if (z == 23) a = "omega";
-		z = (id-5)%5;
+		z = (id-6)%5;
 		strcat(s,a);
 		if (z == 0) a = "leaf";
 		if (z == 1) a = "twig";
@@ -94,8 +94,8 @@ char *plantName(int id) {
 
 #define MAXITEM 23
 // neither (armor and weapons)
-#define I_ARMOR_1 23
-#define I_WEAPON_1 22
+#define I_ARMOR_1 22
+#define I_WEAPON_1 23
 #define I_FOOD 669
 // conditions
 #define COND_NULL 0
@@ -154,14 +154,14 @@ char *ANSI_scr_up = "\x1b\x5b""S";
 char *ANSI_scr_down = "\x1b\x5b""T";
 char *ANSI_home = "\x1b\x5b""H";
 // tileset
-char TILES[256] = ".##:<>!";
-int T_COLORS[256] = {WHITE,WHITE,BLUE,RED,BLACK,BLACK,YELLOW};
+char TILES[256] = ".##:<>";
+int T_COLORS[256] = {WHITE,WHITE,BLUE,RED,BLACK,BLACK};
 #define SOLID 1
 #define PLANT 2
-int T_FLAGS[256] = {0,SOLID,SOLID,0,0,0,SOLID};
-char *T_NAMES[256] = {"air","wall","solid wall","lava","upstairs","downstairs","ERROR!*^%!@&#^%!@#qwertyuio"};
+int T_FLAGS[256] = {0,SOLID,SOLID,0,0,0};
+char *T_NAMES[256] = {"air","wall","solid wall","lava","upstairs","downstairs"};
 void initPlants() {
-	for (int i = T_LASTPH; i<T_LASTPH+121; i++) {
+	for (int i = T_LASTPH; i<T_LASTPH+119; i++) {
 		TILES[i] = '"';
 		T_COLORS[i] = GREEN;
 		T_FLAGS[i] = PLANT;
@@ -171,9 +171,9 @@ void initPlants() {
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
 int enchs[D_WIDTH][D_HEIGHT];
-char *ITEM_CHARS = " !!!!!!!!!!!!!!!!!!!!?/@";
-int ITEM_COLS[] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,GREEN,WHITE,WHITE};
-char *ITEM_NAMES[] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing","scroll of enchantment","dagger","leather armor"};
+char ITEM_CHARS[256] = " !!!!!!!!!!!!!!!!!!!!?@/";
+int ITEM_COLS[256] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,GREEN,WHITE,WHITE};
+char *ITEM_NAMES[256] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing","scroll of enchantment","leather armor","dagger"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 
@@ -369,32 +369,32 @@ void del_item(int item, int quantity) { // delete items from the pack
 	// THIS FUNCTION DOESN'T WORK, WILL BE FIXED
 	// i think it works now (?)
 	char buffer[255];
-	if (!is_contained_in(pack_items,20,item)) {
+	if (!is_contained_in(pack_items,num_pack_slots,item)) {
 		pr_info("You don't have that.");
 	} else {
-		if (pack_counts[is_contained_in(pack_items,20,item)-1] < quantity) { // not enough to remove that many
+		if (pack_counts[is_contained_in(pack_items,num_pack_slots,item)-1] < quantity) { // not enough to remove that many
 			pr_info("You don't have enough of that to remove that many!");
 		} else {
-			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,20,item)-1]-quantity));
+			sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],1,pack_counts[is_contained_in(pack_items,num_pack_slots,item)-1]-quantity));
 			pr_info(buffer);
-			if (pack_counts[is_contained_in(pack_items,20,item)-1] == quantity) {
-				int idx_of = is_contained_in(pack_items,20,item);
+			if (pack_counts[is_contained_in(pack_items,num_pack_slots,item)-1] == quantity) {
+				int idx_of = is_contained_in(pack_items,num_pack_slots,item);
 				for (int i = idx_of; i < num_pack_slots; i++) {
 					pack_items[i-1] = pack_items[i];
 					pack_counts[i-1] = pack_counts[i];
 				}
 				num_pack_slots--;
 			} else {
-				pack_counts[is_contained_in(pack_items,20,item)-1] -= quantity; // take some from the stack
+				pack_counts[is_contained_in(pack_items,num_pack_slots,item)-1] -= quantity; // take some from the stack
 			}
 		}
 	}
 }
 void add_item(int item, int quantity, int ench) { // add an item to your pack
 	char buffer[255];
-	if (is_contained_in(pack_items,20,item)) { // already exists
-    int prev_amt = pack_counts[is_contained_in(pack_items,20,item)-1];
-		pack_counts[is_contained_in(pack_items,20,item)-1] += quantity; // add some more to the stack
+	if (is_contained_in(pack_items,num_pack_slots,item)) { // already exists
+    int prev_amt = pack_counts[is_contained_in(pack_items,num_pack_slots,item)-1];
+		pack_counts[is_contained_in(pack_items,num_pack_slots,item)-1] += quantity; // add some more to the stack
 		sprintf(buffer,"You now have %s.",str_format(ITEM_NAMES[item],0,prev_amt+quantity));
 		pr_info(buffer);
 	} else { // new item
@@ -496,17 +496,16 @@ void remCond(int cond) {
 	}
 }
 int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
+	int sval, mod, ench;
 	if (you) {
-		int sval = WEAPON_SS[weapon_on]-playerStr-weapon_en;
-		int mod = weapon_on - ((sval>0)?sval:0);
-		int ench = weapon_en*2;
-		printf("wgufwgfuygrewfjgj LOOOK HERE MODIFIER %d also aARGS Were (%d,%d,%s,%d)\n",mod+ench,strengthAtk,strengthDef,monstName,you);
+		sval = WEAPON_SS[weapon_on]-playerStr-weapon_en;
+		mod = weapon_on - ((sval>0)?sval:0);
+		ench = weapon_en*2;
 		strengthAtk += mod+ench;
 	} else {
-		int sval = ARMOR_SS[armor_on]-playerStr-armor_en;
-		int mod = armor_on - ((sval>0)?sval:0);
-		int ench = armor_en*2;
-		printf("wgufwgfuygrewfjgj LOOOK HERE MODIFIER %d also aARGS Were (%d,%d,%s,%d)\n",mod+ench,strengthAtk,strengthDef,monstName,you);
+		sval = ARMOR_SS[armor_on]-playerStr-armor_en;
+		mod = armor_on - ((sval>0)?sval:0);
+		ench = armor_en*2;
 		strengthDef += mod+ench;
 	}
 	if (you && is_contained_in(conds, numconds, COND_WEAK)) {
@@ -516,8 +515,15 @@ int attack(int strengthAtk, int strengthDef, char *monstName, bool you) {
 		strengthDef /= 3;
 		strengthDef *= 2;
 	}
+	if (strengthDef < 4) {
+		strengthDef = 4;
+	}
+	if (strengthAtk < 1) {
+		strengthAtk = 1;
+	}
 	strengthAtk += 6;
 	int missChance = (strengthAtk-((!you && is_contained_in(conds, numconds, COND_NOSEE)) ? (strengthDef*2) : strengthDef))/2;
+	if (missChance < 1) missChance = 1;
 	int val = rand()%missChance;
 	char theName[100];
 	sprintf(theName,"The %s",monstName);
@@ -727,11 +733,15 @@ void kobold_ai(int x, int y) {
 void (*MONST_AIS[])(int x, int y) = {basic_monst_ai,basic_monst_ai,kobold_ai};
 bool speed_toggle;
 int main() {
-	srand(time(NULL));
+	FILE *sfile = fopen("seed","r");
+	int curseed;
+	fscanf(sfile,"%d",&curseed);
+	fclose(sfile);
+	srand(curseed);
 	shuffle_rand_items();
 	display_generic_specific();
 	printf("%s",ANSI_clr);
-	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nHave fun! (press a key to start)",GREEN);
+	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nPress ? for help at any time.\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
 	for (int i = 0; i < D_HEIGHT; i++) {
@@ -740,6 +750,7 @@ int main() {
 		}
 	}
 	initPlants();
+	printf("%s\n",T_NAMES[6]);
 	system("python dungeon.py"); // yes, i know, this is a dumb way to do it
 	FILE *dungFile = fopen("dungeon.out","r");
 	for (int i = 0; i < D_HEIGHT; i++) {
@@ -781,16 +792,16 @@ int main() {
 	}
 	// gen items
 	for (int i = 0; i < D_HEIGHT; i++) {
-			for (int j = 0; j < D_WIDTH; j++) {
-				if (!dungeon[i][j] && !(rand()%30)) {
-					items[i][j] = (rand()%MAXITEM)+1;
-					enchs[i][j] = (rand()%3)-1;
-				} else if (!dungeon[i][j] && !(rand()%60)) {
-					items[i][j] = I_POTION_HEAL;
-					enchs[i][j] = 1;
-				}
+		for (int j = 0; j < D_WIDTH; j++) {
+			if (!dungeon[i][j] && !(rand()%30)) {
+				items[i][j] = (rand()%MAXITEM)+1;
+				enchs[i][j] = (rand()%3)-1;
+			} else if (!dungeon[i][j] && !(rand()%120)) {
+				items[i][j] = I_POTION_HEAL;
+				enchs[i][j] = 1;
 			}
 		}
+	}
 	// placeholder for dungeon gen
 	/*
 	player_x = 1;
@@ -807,6 +818,7 @@ int main() {
 	*/
 	bool game_running = true;
 	pr_info("Welcome to INROGUE!");
+	int dlevel = 0;
 	while (game_running) {
 		enforce_borders();
 		printf("%s",ANSI_clr);
@@ -922,6 +934,22 @@ int main() {
 			} else {
 				pr_info("You see nothing to pick up.");
 			}
+		} else if (keypress == 'r') { // remove armor and weapons
+			if (armor_on) {
+				if (armor_en < 0) pr_info("You can't remove the cursed armor you're wearing..."); else {
+
+				add_item(I_ARMOR_1-1+armor_on,1,armor_en);
+				armor_on = 0;
+				armor_en = 0;
+				}
+			}
+			if (weapon_on) {
+				if (weapon_en < 0) pr_info("You can't put down the cursed weapon you're wielding..."); else {
+				add_item(I_WEAPON_1-1+weapon_on,1,weapon_en);
+				weapon_on = 0;
+				weapon_en = 0;
+				}
+			}
 		} else if (keypress == 'u') { // use items
 			take_inventory(1);
 			printf("%sWhich item number? ",ANSI_home);
@@ -1001,7 +1029,7 @@ int main() {
 						learn(pack_items[inum]);
 					}
 					del_item(pack_items[inum],1);
-				} else if (item >= I_ARMOR_1 && item <= I_WEAPON_1) {
+				} else if (item >= I_ARMOR_1 && item < I_WEAPON_1) {
 					if (armor_on) {
 						if (armor_en < 0) pr_info("You can't remove the cursed armor you're wearing..."); else
 						add_item(I_ARMOR_1-1+armor_on,1,armor_en);
@@ -1009,7 +1037,7 @@ int main() {
 					armor_on = pack_items[inum]-I_ARMOR_1+1;
 					armor_en = pack_enchs[inum];
 					del_item(pack_items[inum],1);
-				} else if (item >= I_WEAPON_1 && item <= I_FOOD) {
+				} else if (item >= I_WEAPON_1 && item < I_FOOD) {
 					if (weapon_on) {
 						if (weapon_en < 0) pr_info("You can't put down the cursed weapon you're wielding..."); else
 						add_item(I_WEAPON_1-1+weapon_on,1,weapon_en);
@@ -1024,6 +1052,7 @@ int main() {
 					del_item(pack_items[inum],1);
 					printf("%sThis is a scroll of enchantment. What to enchant?",ANSI_home);
 					scanf("%d",&inum);
+					inum--;
 					if (scrench < 0) {
 						pr_info("The scroll, being cursed, disintegrates in your hands and has no effect.");
 					} else {
@@ -1142,6 +1171,76 @@ int main() {
 				death = 1;
 				pr_info("You burned in lava.");
 				death_reason = "burning in lava";
+			} else if (tile_on >= T_LASTPH) {
+				char buf[64];
+				sprintf(buf,"You walk through a field of %s.",T_NAMES[tile_on]);
+				pr_info(buf);
+			} else if (tile_on == T_DOWNS) {
+				dlevel++;
+				char buf[32];
+				sprintf(buf,"You descend to level %d.",dlevel+1);
+				pr_info(buf);
+				curseed++;
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						seen[i][j] = -1;
+					}
+				}
+				FILE *sfile = fopen("seed","w");
+				fprintf(sfile,"%d",curseed);
+				fclose(sfile);
+				srand(curseed);
+				system("python dungeon.py"); // yes, i know, this is a dumb way to do it
+				FILE *dungFile = fopen("dungeon.out","r");
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						fscanf(dungFile,"%d",&(dungeon[i][j]));
+						fgetc(dungFile);
+						if (dungeon[i][j] == T_UPS) {
+							player_x = j;
+							player_y = i;
+						}
+					}
+				}
+				// no monsters will spawn here
+				visarray[player_y][player_x] = 1;
+				for (int iter = 0; iter < VISION_RANGE; iter++) {
+					for (int i = 0; i < D_HEIGHT; i++) {
+						for (int j = 0; j < D_WIDTH; j++) {
+							if (visarray[i][j] != 1 && ((visarray[i+1][j] == 1 && !tile_flag(j,i+1,SOLID)) || (visarray[i-1][j] == 1 && !tile_flag(j,i-1,SOLID)) || (visarray[i][j+1] == 1 && !tile_flag(j+1,i,SOLID))|| (visarray[i][j-1] == 1 && !tile_flag(j-1,i,SOLID)))) {
+								visarray[i][j] = 2;
+							}
+						}
+					}
+					for (int i = 0; i < D_HEIGHT; i++) {
+						for (int j = 0; j < D_WIDTH; j++) {
+							if (visarray[i][j] == 2) {
+								visarray[i][j] = 1;
+							}
+						}
+					}
+				}
+				// gen monsters
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						mdamages[i][j] = 0;
+						if (!dungeon[i][j] && !visarray[i][j] && !(rand()%(40-dlevel*3))) {
+							monsters[i][j] = KOBOLD;
+						}
+					}
+				}
+				// gen items
+				for (int i = 0; i < D_HEIGHT; i++) {
+					for (int j = 0; j < D_WIDTH; j++) {
+						if (!dungeon[i][j] && !(rand()%30)) {
+							items[i][j] = (rand()%MAXITEM)+1;
+							enchs[i][j] = (rand()%3)-1;
+						} else if (!dungeon[i][j] && !(rand()%(120+dlevel*10))) {
+							items[i][j] = I_POTION_HEAL;
+							enchs[i][j] = 1;
+						}
+					}
+				}
 			}
 		}	
 
@@ -1180,7 +1279,7 @@ int main() {
 	if (death) { // did you die, or did the user quit?
 		printf("%s",ANSI_clr);
 		color_set(RED);
-		printf("GAME OVER\nYou died on level POOP of the dungeon.\nYou were killed by %s.\nPress any key to exit the game\n",death_reason);
+		printf("GAME OVER\nYou died on level %d of the dungeon.\nYou were killed by %s.\nPress any key to exit the game\n",dlevel+1,death_reason);
 		color_reset();
 		getch_(0);
 	}

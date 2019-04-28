@@ -733,15 +733,22 @@ void kobold_ai(int x, int y) {
 void (*MONST_AIS[])(int x, int y) = {basic_monst_ai,basic_monst_ai,kobold_ai};
 bool speed_toggle;
 int main() {
-	FILE *sfile = fopen("seed","r");
+	FILE *sfile = fopen("seed","w");
 	int curseed;
-	fscanf(sfile,"%d",&curseed);
+  printf("Generate random dungeon? (y/n) ");
+  if (getch_(1) == 'y') {
+    curseed = time(NULL);
+  } else {
+    printf("\nEnter seed: ");
+    scanf("%d",&curseed);
+  }
+	fprintf(sfile,"%d",curseed);
 	fclose(sfile);
 	srand(curseed);
 	shuffle_rand_items();
 	display_generic_specific();
 	printf("%s",ANSI_clr);
-	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Amulet of John Doe from the 26th floor of the dungeon!\nPress ? for help at any time.\nHave fun! (press a key to start)",GREEN);
+	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Omelette of Yendor from the 26th floor of the dungeon!\nPress ? for help at any time.\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
 	for (int i = 0; i < D_HEIGHT; i++) {
@@ -1284,3 +1291,4 @@ int main() {
 		getch_(0);
 	}
 }
+

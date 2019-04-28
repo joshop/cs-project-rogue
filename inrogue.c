@@ -750,6 +750,15 @@ int main() {
 	printf("%s",ANSI_clr);
 	printc("Welcome to YACrogue!\nMade by Vijay Shanmugam and Joshua Piety\nCollect the mighty Omelette of Yendor from the 26th floor of the dungeon!\nPress ? for help at any time.\nHave fun! (press a key to start)",GREEN);
 	getch_(0);
+	printc("\nWould you like to view help? ",GREEN);
+	if (getch_(1) == 'y') {
+		printf("%s%sWelcome to YACROGUE! In this game, you must adventure through the dungeon! Note that this is a VERY early version of the game.\nCommands:\narrows - move, or attack a monster by moving into it\ni - view your items\nw - view armor and weapons\nu - use an item\np - pick up an item on the floor\n? - view help\nshift-d - activate DEBUG MODE (if you are testing this game, this mode is highly suggested!)\nPress any key to go to next page...\n",ANSI_clr,ANSI_home);
+		getch_(0);
+		printf("%s%sPotions are magical elixirs that one can drink to have varying effects. Some do nothing, some have positive effects and some have negative effects. In this early version, some potions cannot be used. \nYou will not immediately know what a potion does upon finding it always. Some potions will simply be identified by a color. Negative potions are always found disguised as positive potions. \nNOTE: It is RANDOM what colors correspond to what potions. DO NOT ASK ME \"what the red potion does\". I DO NOT KNOW.\nThe following potions exist:\nHealing - heals you.\nAcid - hurts you.\nSpeed - speeds your movement and attack.\nSlow - slows your movement and attack.\nStrength - permanently increases your strength.\nWeakness - decreases your strength for some time.\nInvisibility - makes you invisible.\nBlindness - causes you to go blind temporarily.\nEndurance - increases your maximum health.\nPress any key to go to the next page...\n",ANSI_clr,ANSI_home);
+		getch_(0);
+		printf("%s%sYou will encounter monsters in the dungeon. Only one currently exists: the kobold. It will attempt to move towards you and attack when it is near. Defeat them by any means!\nLava also exists in the dungeon. If you touch it, you die.\nPress any key to exit help...",ANSI_clr,ANSI_home);
+		getch_(0);
+	}
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
 	for (int i = 0; i < D_HEIGHT; i++) {
 		for (int j = 0; j < D_WIDTH; j++) {
@@ -1035,6 +1044,9 @@ int main() {
 						applyCond(COND_BLIND,20);
 						learn(pack_items[inum]);
 					}
+					del_item(pack_items[inum],1);
+				} else if (item > I_POTION_MAXHP && item < I_SCROLL_ENCH) {
+					pr_info("You drink the potion, but nothing happens.");
 					del_item(pack_items[inum],1);
 				} else if (item >= I_ARMOR_1 && item < I_WEAPON_1) {
 					if (armor_on) {

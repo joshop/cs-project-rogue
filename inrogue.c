@@ -15,6 +15,14 @@
 
 #define VISION_RANGE 5
 #define OMNISCIENCE 0
+// spell nums, data
+#define SP_NOTHING 0
+#define SP_MISSILE 1
+#define SP_SPEED 2
+#define SP_BLINK 3
+#define SP_HEAL 4
+char *spellNames[] = {"nothing","magic missile","speed","teleport","heal self"};
+int spellCosts[] = {0,5,10,10,10};
 // tile nums
 #define T_AIR 0
 #define T_WALL 1
@@ -92,10 +100,14 @@ char *plantName(int id) {
 #define I_POTION_CURE 20
 #define I_SCROLL_ENCH 21
 
-#define MAXITEM 23
+#define MAXITEM 27
 // neither (armor and weapons)
 #define I_ARMOR_1 22
 #define I_WEAPON_1 23
+#define I_SPELLBOOK_MM 24
+#define I_SPELLBOOK_SP 25
+#define I_SPELLBOOK_BL 26
+#define I_SPELLBOOK_HP 27
 #define I_FOOD 669
 // conditions
 #define COND_NULL 0
@@ -171,9 +183,9 @@ void initPlants() {
 // itemset and items on map
 int items[D_WIDTH][D_HEIGHT];
 int enchs[D_WIDTH][D_HEIGHT];
-char ITEM_CHARS[256] = " !!!!!!!!!!!!!!!!!!!!?@/";
-int ITEM_COLS[256] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,GREEN,WHITE,WHITE};
-char *ITEM_NAMES[256] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing","scroll of enchantment","leather armor","dagger"};
+char ITEM_CHARS[256] = " !!!!!!!!!!!!!!!!!!!!?@/####";
+int ITEM_COLS[256] = {WHITE,RED,GREEN,BLUE,YELLOW,RED,MAGENTA,BLUE,MAGENTA,WHITE,BLACK,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,WHITE,GREEN,WHITE,WHITE,RED,GREEN,BLUE,MAGENTA};
+char *ITEM_NAMES[256] = {"nothing","red potion","green potion","blue potion","yellow potion","orange potion","purple potion","cyan potion","magenta potion","white potion","black potion","potion of healing","potion of speed","potion of invisibility","potion of strength","potion of endurance","potion of fire resistance","potion of cold resistance","potion of incorporeality","potion of regeneration","potion of curing","scroll of enchantment","leather armor","dagger","spellbook of magic missile","spellbook of speed","spellbook of teleport","spellbook of heal self"};
 // dungeon
 int dungeon[D_WIDTH][D_HEIGHT];
 
@@ -478,7 +490,94 @@ int armor_en = 0;
 int playerStr = 10;
 int maxhp = 100;
 
-int hp = 100; // hit points
+int maxpow = 10;
+int power = 10;
+int knownSpells[10];
+int numSpells = 0;
+void spMagicMissile() {
+	printf("%sYou release a magic missile!\nWhich direction? (arrows)",ANSI_home);
+	char x = getch_(0);
+	int locx = player_x;
+	int locy = player_y;
+	do {
+		x = getch_(0);
+	} while (x != '\x1b');
+	x = getch_(0);
+	if (x == '\x5b') {
+		power -= 5;
+		switch(getch_(0)) {
+		case 'A':
+			locy--;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s|",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locy--;
+			}
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			if (tile_flag(locx,locy,SOLID)) {
+				pr_info("The magic missile hits a wall!");
+			} else {
+				pr_info("The magic missile hits a foe!");
+				mdamages[locy][locx] += 30;
+			}
+			break;
+		case 'B':
+			locy++;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s|",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locy++;
+			}
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			if (tile_flag(locx,locy,SOLID)) {
+				pr_info("The magic missile hits a wall!");
+			} else {
+				pr_info("The magic missile hits a foe!");
+				mdamages[locy][locx] += 30;
+			}
+			break;
+		case 'C':
+			locx++;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s-",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locx++;
+			}
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			if (tile_flag(locx,locy,SOLID)) {
+				pr_info("The magic missile hits a wall!");
+			} else {
+				pr_info("The magic missile hits a foe!");
+				mdamages[locy][locx] += 30;
+			}
+			break;
+		case 'D':
+			locx--;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s-",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locx--;
+			}
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			if (tile_flag(locx,locy,SOLID)) {
+				pr_info("The magic missile hits a wall!");
+			} else {
+				pr_info("The magic missile hits a foe!");
+				mdamages[locy][locx] += 30;
+			}
+			break;
+		default:
+			pr_info("What?");
+			power += 5;
+		}
+	} else {
+		pr_info("Never mind.");
+	}
+}
 int conds[10];
 int numconds = 0;
 int condDur[10];
@@ -487,6 +586,152 @@ void applyCond(int cond, int dur) {
 	condDur[numconds] = dur;
 	numconds++;
 }
+void spSpeed() {
+	power -= 10;
+	applyCond(COND_SPEED,30);
+}
+void spTeleport() {
+	printf("%sYou teleport!\nWhich direction? (arrows)",ANSI_home);
+	char x = getch_(0);
+	int locx = player_x;
+	int locy = player_y;
+	do {
+		x = getch_(0);
+	} while (x != '\x1b');
+	x = getch_(0);
+	if (x == '\x5b') {
+		power -= 10;
+		switch(getch_(0)) {
+		case 'A':
+			locy--;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s|",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locy--;
+			}
+			locy++;
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			player_x = locx;
+			player_y = locy;
+			break;
+		case 'B':
+			locy++;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s|",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locy++;
+			}
+			locy--;
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			player_x = locx;
+			player_y = locy;
+			break;
+		case 'C':
+			locx++;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s-",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locx++;
+			}
+			locx--;
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			player_x = locx;
+			player_y = locy;
+			break;
+		case 'D':
+			locx--;
+			while (!monsters[locy][locx] && !tile_flag(locx,locy,SOLID)) {
+				printf("%s%s%s-",ANSI_home,times(ANSI_right,locx),times(ANSI_down,locy+1));
+				locx--;
+			}
+			do {
+				x = getch_(0);
+			} while (x != '\n');
+			locx++;
+			player_x = locx;
+			player_y = locy;
+			break;
+		default:
+			pr_info("What?");
+			power += 5;
+		}
+	} else {
+		pr_info("Never mind.");
+	}
+}
+int hp = 100; // hit points
+void spHeal() {
+	power -= 10;
+	hp = maxhp;
+}
+void (*spells[]) (void) = {0, spMagicMissile, spSpeed, spTeleport, spHeal};
+void gainSpell(int id) {
+	if (is_contained_in(knownSpells,numSpells,id)) {
+		pr_info("You already knew that spell!");
+		power += spellCosts[id];
+		spells[id]();
+	} else {
+		char buffer[64];
+		sprintf(buffer,"You learned the \"%s\" spell!",spellNames[id]);
+		pr_info(buffer);
+		knownSpells[numSpells++] = id;
+	}
+}
+
+
+void randSpellEffect(int mustBad) {
+	int effectNum = rand()%(mustBad ? 6 : 15);
+	switch(effectNum) {
+		case 0:
+		pr_info("You can't see!");
+		applyCond(COND_BLIND, 20);
+		break;
+		case 1:
+		pr_info("You feel weak!");
+		applyCond(COND_WEAK, 20);
+		break;
+		case 2:
+		pr_info("You find yourself somewhere else!");
+		do {
+			player_x = rand()%D_WIDTH;
+			player_y = rand()%D_HEIGHT;
+		} while (tile_flag(player_x,player_y,SOLID));
+		break;
+		case 3:
+		pr_info("You are struck with pain!");
+		hp /= 2;
+		break;
+		case 4:
+		pr_info("You can't move!");
+		applyCond(COND_NOMOVE, 20);
+		break;
+		case 5:
+		pr_info("You feel slower!");
+		applyCond(COND_SLOW, 20);
+		break;
+		case 6:
+		case 7:
+		hp = maxhp;
+		break;
+		case 8:
+		pr_info("You feel faster!");
+		applyCond(COND_SPEED, 20);
+		break;
+		case 9:
+		pr_info("You feel invisible!");
+		applyCond(COND_NOSEE, 20);
+		break;
+		case 10:
+		pr_info("Your strength increases!");
+		playerStr++;
+		break;
+	}
+}
+
+
 void remCond(int cond) {
 	int loc = is_contained_in(conds, numconds, cond)-1;
 	conds[loc] = COND_NULL;
@@ -756,7 +1001,11 @@ int main() {
 		getch_(0);
 		printf("%s%sPotions are magical elixirs that one can drink to have varying effects. Some do nothing, some have positive effects and some have negative effects. In this early version, some potions cannot be used. \nYou will not immediately know what a potion does upon finding it always. Some potions will simply be identified by a color. Negative potions are always found disguised as positive potions. \nNOTE: It is RANDOM what colors correspond to what potions. DO NOT ASK ME \"what the red potion does\". I DO NOT KNOW.\nThe following potions exist:\nHealing - heals you.\nAcid - hurts you.\nSpeed - speeds your movement and attack.\nSlow - slows your movement and attack.\nStrength - permanently increases your strength.\nWeakness - decreases your strength for some time.\nInvisibility - makes you invisible.\nBlindness - causes you to go blind temporarily.\nEndurance - increases your maximum health.\nPress any key to go to the next page...\n",ANSI_clr,ANSI_home);
 		getch_(0);
-		printf("%s%sYou will encounter monsters in the dungeon. Only one currently exists: the kobold. It will attempt to move towards you and attack when it is near. Defeat them by any means!\nLava also exists in the dungeon. If you touch it, you die.\nPress any key to exit help...",ANSI_clr,ANSI_home);
+		printf("%s%sYou will encounter monsters in the dungeon. Only one currently exists: the kobold. It will attempt to move towards you and attack when it is near. Defeat them by any means!\nLava also exists in the dungeon. If you touch it, you die.\nPress any key to continue...",ANSI_clr,ANSI_home);
+		getch_(0);
+		printf("%s%sArmor (leather armor) and weapons (daggers) can be found around the dungeon. They will increase your combat capabilities, but beware - some can be found cursed which means that not only do they have a negative effect, but they cannot be removed.\nYou can also find scrolls of enchantment, which will increase the power of a piece of equipment, and can remove curses. They can also be used on potions to turn a negative potion into a neutral potion and a neutral potion into a positive potion. However, in order to use them on armor or weapons they must be in your inventory rather than equipped - use \"r\" to remove weapons and armor.\nPress any key to exit help...",ANSI_clr,ANSI_home);
+		getch_(0);
+		printf("%s%sSpellbooks are magical tomes that can be found occasionally around the dungeon. They imbue you with the magical energy necessary to cast a spell. This can be done by pressing \"c\" to cast. Spells require magic points (MP) to cast.\nWhen a spellbook is read, it can be misinterpreted to produce a random effect. Beware: if it is cursed, that will happen 100%% of the time, and always with a bad effect!\nSometimes, you start the game with a spell. If you read a spellbook of a spell you already know, it will give you a free casting of that spell (without expending MP).\nPress any key to exit help...",ANSI_clr,ANSI_home);
 		getch_(0);
 	}
 	fill_tiles(0,0,D_WIDTH,D_HEIGHT,T_AIR);
@@ -767,7 +1016,7 @@ int main() {
 	}
 	initPlants();
 	printf("%s\n",T_NAMES[6]);
-	system("python dungeon.py"); // yes, i know, this is a dumb way to do it
+	system("python3 dungeon.py"); // yes, i know, this is a dumb way to do it
 	FILE *dungFile = fopen("dungeon.out","r");
 	for (int i = 0; i < D_HEIGHT; i++) {
 		for (int j = 0; j < D_WIDTH; j++) {
@@ -834,6 +1083,9 @@ int main() {
 	*/
 	bool game_running = true;
 	pr_info("Welcome to INROGUE!");
+	if (rand()%3) {
+		gainSpell(rand()%4+1);
+	}
 	int dlevel = 0;
 	while (game_running) {
 		enforce_borders();
@@ -872,6 +1124,8 @@ int main() {
 		printf("%s%s",times("-",num_dash),times(" ",10-num_dash));
 		color_reset();
 		printf("| ");
+		if (rand()%20 == 0 && power < maxpow) power++;
+		printf("MP: %d ",power);
 		for (int c = 0; c < numconds; c++) {
 			switch (conds[c]) {
 			 case COND_SPEED:
@@ -894,6 +1148,10 @@ int main() {
 				 color_set(RED);
 				 printf("BLIND ");
 				 break;
+			 case COND_NOMOVE:
+			 	 color_set(RED);
+			 	 printf("PARA ");
+			 	 break;
 			}
 		}
 		color_reset();
@@ -1048,6 +1306,25 @@ int main() {
 				} else if (item > I_POTION_MAXHP && item < I_SCROLL_ENCH) {
 					pr_info("You drink the potion, but nothing happens.");
 					del_item(pack_items[inum],1);
+				} else if (item >= I_SPELLBOOK_MM && item <= I_SPELLBOOK_HP) {
+					int spellType = item - I_SPELLBOOK_MM + 1;
+					if (pack_enchs[inum] == 0) {
+						if (rand()%3 == 0) {
+							gainSpell(spellType);
+						} else {
+							if (rand()%3 == 0) {
+								pr_info("You read the spell wrong!");
+								randSpellEffect(0);
+							} else {
+								pr_info("You can't read this spellbook; it's too complicated.");							}
+						}
+					} else if (pack_enchs[inum] > 0) {
+						gainSpell(spellType);
+					} else {
+						pr_info("This spellbook was cursed!");
+						randSpellEffect(1);
+					}
+					del_item(pack_items[inum],1);
 				} else if (item >= I_ARMOR_1 && item < I_WEAPON_1) {
 					if (armor_on) {
 						if (armor_en < 0) pr_info("You can't remove the cursed armor you're wearing..."); else
@@ -1094,7 +1371,7 @@ int main() {
 				}
 			}
 		} else if (keypress == 'w') { // view wielding and wearing
-			printf("%sWearing:\n%s%s\nWearing:\n%s%s\n",ANSI_home,armor_on?ITEM_NAMES[I_ARMOR_1+armor_on-1]:"nothing",(playerStr>=ARMOR_SS[armor_on])?"":" (heavy)",weapon_on?ITEM_NAMES[I_WEAPON_1+weapon_on-1]:"nothing",(playerStr>=WEAPON_SS[weapon_on])?"":" (heavy)");
+			printf("%sWearing:\n%s%s\nWielding:\n%s%s\n",ANSI_home,armor_on?ITEM_NAMES[I_ARMOR_1+armor_on-1]:"nothing",(playerStr>=ARMOR_SS[armor_on])?"":" (heavy)",weapon_on?ITEM_NAMES[I_WEAPON_1+weapon_on-1]:"nothing",(playerStr>=WEAPON_SS[weapon_on])?"":" (heavy)");
 			getch_(0);
 		} else if (keypress == 'i') { // take inventory
 			take_inventory(0);
@@ -1154,7 +1431,11 @@ int main() {
 			getch_(0);
 			printf("%s%sPotions are magical elixirs that one can drink to have varying effects. Some do nothing, some have positive effects and some have negative effects. In this early version, some potions cannot be used. \nYou will not immediately know what a potion does upon finding it always. Some potions will simply be identified by a color. Negative potions are always found disguised as positive potions. \nNOTE: It is RANDOM what colors correspond to what potions. DO NOT ASK ME \"what the red potion does\". I DO NOT KNOW.\nThe following potions exist:\nHealing - heals you.\nAcid - hurts you.\nSpeed - speeds your movement and attack.\nSlow - slows your movement and attack.\nStrength - permanently increases your strength.\nWeakness - decreases your strength for some time.\nInvisibility - makes you invisible.\nBlindness - causes you to go blind temporarily.\nEndurance - increases your maximum health.\nPress any key to go to the next page...\n",ANSI_clr,ANSI_home);
 			getch_(0);
-			printf("%s%sYou will encounter monsters in the dungeon. Only one currently exists: the kobold. It will attempt to move towards you and attack when it is near. Defeat them by any means!\nLava also exists in the dungeon. If you touch it, you die.\nPress any key to exit help...",ANSI_clr,ANSI_home);
+			printf("%s%sYou will encounter monsters in the dungeon. Only one currently exists: the kobold. It will attempt to move towards you and attack when it is near. Defeat them by any means!\nLava also exists in the dungeon. If you touch it, you die.\nPress any key to continue...",ANSI_clr,ANSI_home);
+			getch_(0);
+			printf("%s%sArmor (leather armor) and weapons (daggers) can be found around the dungeon. They will increase your combat capabilities, but beware - some can be found cursed which means that not only do they have a negative effect, but they cannot be removed.\nYou can also find scrolls of enchantment, which will increase the power of a piece of equipment, and can remove curses. They can also be used on potions to turn a negative potion into a neutral potion and a neutral potion into a positive potion. However, in order to use them on armor or weapons they must be in your inventory rather than equipped - use \"r\" to remove weapons and armor.\nPress any key to continue...",ANSI_clr,ANSI_home);
+			getch_(0);
+			printf("%s%sSpellbooks are magical tomes that can be found occasionally around the dungeon. They imbue you with the magical energy necessary to cast a spell. This can be done by pressing \"c\" to cast. Spells require magic points (MP) to cast.\nWhen a spellbook is read, it can be misinterpreted to produce a random effect. Beware: if it is cursed, that will happen 100%% of the time, and always with a bad effect!\nSometimes, you start the game with a spell. If you read a spellbook of a spell you already know, it will give you a free casting of that spell (without expending MP).\nPress any key to exit help...",ANSI_clr,ANSI_home);
 			getch_(0);
 		} else if (keypress == 'D') {
 			printf("%s\n1. Give item\n2. Identify item\n3. Give condition\n4. Exit",ANSI_home);
@@ -1180,6 +1461,34 @@ int main() {
 				printf("%sWhich item number? ",ANSI_home);
 				scanf("%d",&dchoice);
 				learn(pack_items[dchoice-1]);
+			}
+		} else if (keypress == '$') {
+			printf("%sCurrent depth: %d\nCurrent seed: %d\n",ANSI_home,dlevel,curseed);
+			getch_(0);
+		} else if (keypress == 'c') { // cast a spell!
+			if (numSpells) {
+				printf("%s\n",ANSI_home);
+				int validSpell = 1;
+				for (int i = 0; i < numSpells; i++) {
+					if (spellCosts[knownSpells[i]] <= power) {
+						printf("%d. %s (%d MP)\n",validSpell,spellNames[knownSpells[i]],spellCosts[knownSpells[i]]);
+						validSpell++;
+					} else {
+						faint(1);
+						printf("    %s (%d MP)\n",spellNames[knownSpells[i]],spellCosts[knownSpells[i]]);
+						faint(0);
+					}
+				}
+				printf("%sSelect spell:",ANSI_home);
+				int spellChoice;
+				scanf("%d",&spellChoice);
+				if (spellChoice < 0 || spellChoice >= validSpell) {
+					pr_info("You don't have that many usable spells.");
+				} else {
+					spells[knownSpells[spellChoice-1]]();
+				}
+			} else {
+				pr_info("You know no spells.");
 			}
 		}
 		// check what you're standing on

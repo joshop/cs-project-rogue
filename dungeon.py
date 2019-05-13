@@ -118,7 +118,7 @@ def generate(cellsX, cellsY, cellSize=5):
     os.system("clear")
     print("Generating dungeon: 4/7")
     # 5. Pick 0 or more pairs of adjacent cells that are not connected and connect them.
-    extraConnections = random.randint((cellsX + cellsY) / 4, int((cellsX + cellsY) / 1.2))
+    extraConnections = random.randint((cellsX + cellsY) // 4, int((cellsX + cellsY) // 1.2))
     maxRetries = 10
     while extraConnections > 0 and maxRetries > 0:
         cell = random.choice(list(cells.values()))
@@ -197,12 +197,20 @@ def generate(cellsX, cellsY, cellSize=5):
     print("Processing dungeon: 1/1")
     # some new code: lava!
     def pathFound(): # is there a path from the upstairs -> downstairs?
+        #input("pathFound() called")
         pathTiles = {}
         for a in tiles.keys():
             if a == stairsUp: pathTiles[a] = 1
             elif a == stairsDown: pathTiles[a] = 2
             else: pathTiles[a] = 0
         for iter in range(100): # eh should be enough iterations for now
+            #print("iteration no. %d" % iter)
+            for ta in range(50):
+                s = ""
+                for tb in range(50):
+                    s += ' <>'[pathTiles[(ta,tb)]]
+                #print(s)
+            #input("press enter...")
             for t in pathTiles.keys():
                 adj = [pathTiles.get(z) for z in [(t[0],t[1]+1),(t[0],t[1]-1),(t[0]+1,t[1]),(t[0]-1,t[1])] if (str(tiles.get(z)) in '<.>"' or type(tiles.get(z)) == int)and pathTiles.get(z)]
                 if 1 in adj and 2 in adj: return True
